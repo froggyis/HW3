@@ -1,6 +1,15 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream>
+#include <vector>
+#include <algorithm>
+#include <unordered_map>
+#include <cmath>
+#include <climits>
 using namespace std;
 
+//  ../bin/hw3 ../testcases/n100.hardblocks ../testcases/n100.nets ../testcases/n100.pl 0.1
 
 struct HardBlock
 {
@@ -147,11 +156,12 @@ int main(int argc, char *argv[])
   floor_plan_region = sqrt(total_block_area * (1+dead_space_ratiod));
   //TODO 2-2, initialize NPE
   InitializeNPE(NPE);
-  // for(auto c : NPE)
-  // {
-  //   cout<<c<<" ";
-  // }
-  Placement(NPE);;
+  for(auto c : NPE)
+  {
+    cout<<c<<" ";
+  }
+  // cout<<endl<<"NPE size : "<<NPE.size()<<endl;
+  Placement(NPE);
 
   return 0;
 }
@@ -160,37 +170,43 @@ int main(int argc, char *argv[])
 
 void InitializeNPE(vector<int> &NPE)
 {
-  int row_cnt = 1 ;
+  vector<int> tmp;
   int cur_width = 0;
-  auto HB = HBList[0];
-  cur_width += HB->width;
-  NPE.emplace_back(0);
-  for(int i = 1 ; i<HBList.size(); i++)
+  int row_cnt = 0;
+  bool new_hb = true;
+  bool new_row = true;
+  for(int i = 0 ; i<HBList.size(); i++)
   {
     auto HB = HBList[i];
-    cur_width += HB->width;
-    if(cur_width <= floor_plan_region)//if current row can still fit with HB
+    if(cur_width + HB->width <= floor_plan_region)
     {
-      
-      NPE.emplace_back(i);
-      NPE.emplace_back(-1);
-
+      tmp.emplace_back(i);
+      if(!new_hb)
+      {
+        tmp.emplace_back(-1);
+      }
+      cur_width += HB->width;
+      new_hb = false;
     }
 
-    else//if not , We go to new row and continue the process
+    else
     {
+      NPE.insert(NPE.end(), tmp.begin(), tmp.end());
+      tmp.clear();
+      tmp.emplace_back(i);
       cur_width = HB->width;
-      row_cnt=2;
-    }
-
-    if(row_cnt==2)//whenever we make two row, we need to inset an H cut into NPE
-    {
-      NPE.emplace_back(-2);
-      row_cnt=1;
+      if(!new_row)
+      {
+        NPE.emplace_back(-2);
+      }
+      new_row = false;
+      
     }
   }
+  NPE.insert(NPE.end(), tmp.begin(), tmp.end());
   NPE.emplace_back(-2);
 }
+
 
 void Placement(vector<int> &NPE)
 {
@@ -198,8 +214,6 @@ void Placement(vector<int> &NPE)
   int cor_x = 0, cor_y = 0;
   int height_max = INT_MIN;
   pair<int, int>cur_coor = make_pair(0, 0);
-  cout<<HBList.size()<<endl;
-  cout<<NPE.size()<<endl;
   for(int i = 0 ; i<NPE.size()-1 ; i++)
   {
     if(NPE[i]!=-1 && NPE[i]!= -2)
@@ -218,9 +232,8 @@ void Placement(vector<int> &NPE)
 
   
   }
-  for(auto name : tmp)
-    cout<<"name : "<<name.first<<" x : "<<name.second.first<<"y : "<<name.second.second<<endl;
+  // for(auto name : tmp)
+  //   cout<<"name : "<<name.first<<" x : "<<name.second.first<<"y : "<<name.second.second<<endl;
 
 }
-
 
