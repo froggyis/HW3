@@ -44,22 +44,34 @@ vector<Net*> NetList;
 
 struct TreeNode
 {
-    int type, width, weight;
+    int type, width, height;//1 for block -1 for V, -2 for H
     HardBlock *hardblock;
     TreeNode *lchild, *rchild;
-    vector<tuple<int, int, int,int >> shape;
-    
-    TreeNode(int type, HardBlock* hardblock = nullptr):
-      type(type), hardblock(hardblock), lchild(nullptr), rchild(nullptr){};
+    vector<vector<int>> shape; //record for stockmeyer
 
-    void update();
+    // TreeNode(int type, HardBlock* hardblock):
+    //   type(type), hardblock(hardblock), lchild(nullptr), rchild(nullptr)
+    //   {
+    //     shape = {{hardblock->width, hardblock->height, 0, 0},
+    //    {hardblock->height, hardblock->width, 1, 1}};
+    //   };
+
+    TreeNode(int type):
+    type(type), hardblock(nullptr), lchild(nullptr), rchild(nullptr){};
+    
+
+    void stockmeyer();
 };
 
 vector<int> NPE ;//0~n stands for HB , -1 stands for V cut while -2 stands for H cut
 void InitializeNPE(vector<int> &NPE);
 void Placement(vector<int> &NPE);
+void ChangeCut(vector<int> &NPE);
+bool ifSkew(vector<int> &NPE);
+bool ifBallot(vector<int> &NPE);
 
 double floor_plan_region;
+TreeNode *constructTree(vector<int> &NPE);
 int main(int argc, char *argv[])
 {
   //TODO 1. Parser
@@ -156,15 +168,27 @@ int main(int argc, char *argv[])
   floor_plan_region = sqrt(total_block_area * (1+dead_space_ratiod));
   //TODO 2-2, initialize NPE
   InitializeNPE(NPE);
-  for(auto c : NPE)
+  // for(auto c : NPE)
+  // {
+  //   cout<<c<<" ";
+  // }
+
+  auto root = constructTree(NPE);
+  while(root->lchild)
   {
-    cout<<c<<" ";
+    for(auto c : root->shape)
+    {
+       cout << c[0] << endl;
+    }
+
+    root = root->lchild;
   }
-  // cout<<endl<<"NPE size : "<<NPE.size()<<endl;
-  Placement(NPE);
 
   return 0;
+
 }
+
+
 
 // 12V3V4H.....
 
@@ -237,3 +261,118 @@ void Placement(vector<int> &NPE)
 
 }
 
+
+void ChangeCut(vector<int> &NPE)
+{
+  for(int i = 0 ; i<NPE.size(); i++)
+  {
+    if(NPE[i]==-1)NPE[i]=-2;
+    if(NPE[i]==-2)NPE[i]=-1;
+  }
+}
+
+
+bool ifSkew(vector<int> &NPE)
+{
+  for(int i = 1 ; i<NPE.size() ; i++)
+  {
+    if( NPE[i] == NPE[i-1] ||  NPE[i] == NPE[i+1])
+      return false;
+  }
+  return true;
+
+}
+
+bool ifBallot(vector<int> &NPE)
+{
+  int operand = 0 ;
+  int operators = 0 ;
+
+  for(auto n : NPE)
+  {
+    if(n==-1 || n==-2)operators++;
+    else operand++;
+  }
+  if(operand< operators)return false;
+  return true;
+  
+}
+
+
+TreeNode *constructTree(vector<int> &NPE)
+{
+  vector<TreeNode *>postorder;
+  for(int block : NPE)
+  {
+    if(block >=0)// if block is hardblock then push
+    {
+      auto *hb = HBList[block];
+      TreeNode *node = new TreeNode(0); // 0 means this node is an hardblock
+      node->shape  = {{hb->width, hb->height, 0, 0},{hb->height, hb->width, 1, 1}};//build the node for stockmeyer
+      postorder.push_back(node);
+    }
+
+    else//if block is V/H then pop and run stockmeyer
+    {
+      TreeNode *CutNode = new TreeNode(block);
+      CutNode->type = block;
+      
+      auto Rnode = postorder.back();
+      postorder.pop_back();
+      CutNode->rchild = Rnode;
+
+      auto Lnode = postorder.back();
+      postorder.pop_back();
+      CutNode->lchild = Lnode;
+
+      postorder.push_back(CutNode);
+      CutNode->stockmeyer();
+    }
+  }
+  return postorder.back();
+}
+
+
+void TreeNode::stockmeyer()
+{
+  int i, j;
+  //when we implement the tree, check whether the node is CUT or HARDBLOCK.
+  //if the block is CUT then we implemnt the STOCKMEYER algorithm to update our shape
+  // -1 means VERTICAL cut while -2 means HORIZONTAL
+  vector<int> tmp;
+  if(type==-1)
+  {
+    i = 0;
+    j = 0;
+    sort(lchild->shape.begin(), lchild->shape.end());  // without assign lamda function it will sort by the first element 
+    sort(rchild->shape.begin(), rchild->shape.end());
+    // cout<<"lchild : "<<lchild->shape.size()<<"rchild : "<<rchild->shape.size()<<endl;
+    while (i< lchild->shape.size() && j < rchild->shape.size())
+    {
+      tmp = {lchild->shape[i][0] + rchild->shape[i][0], max(lchild->shape[i][1], rchild->shape[i][1]), i, j};
+      shape.emplace_back(tmp);
+      if(lchild->shape[i][0] > rchild->shape[i][0]) i ++;
+      else if (lchild->shape[i][0] < rchild->shape[i][0]) j++;
+      else i++;j++;
+    }
+    
+  }
+
+  else
+  {
+    i = 0;
+    j = 0;
+    sort(lchild->shape.begin(), lchild->shape.end(), greater<>());  // without assign lamda function it will sort by the first element 
+    sort(rchild->shape.begin(), rchild->shape.end(), greater<>());  // sort by decending order.
+    while (i<lchild->shape.size() && j < rchild->shape.size())
+    {
+      tmp = {lchild->shape[i][0] + rchild->shape[i][0], max(lchild->shape[i][1], rchild->shape[i][1]), i, j};
+      shape.emplace_back(tmp);
+      if(lchild->shape[i][0] > rchild->shape[i][0]) i ++;
+      else if (lchild->shape[i][0] < rchild->shape[i][0]) j++;
+      else i++;j++;
+    }
+
+  }
+
+}
