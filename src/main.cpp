@@ -1,378 +1,652 @@
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <sstream>
-#include <vector>
 #include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <tuple>
+#include <vector>
+#include <chrono>
 #include <unordered_map>
-#include <cmath>
 #include <climits>
+#include <cmath>
+#include <deque>
+#include "parser.hpp"
 using namespace std;
 
-//  ../bin/hw3 ../testcases/n100.hardblocks ../testcases/n100.nets ../testcases/n100.pl 0.1
 
-struct HardBlock
-{
-  string name;
-  int width, height;
-  pair<int, int>coor;
-  bool isrotate ;
-  // pin* center_pin;
+// struct pin
+// {
+//   string id; 
+//   int x_cor, y_cor;
+
+//   pin(string id, int x_cor, int y_cor):id(id), x_cor(x_cor), y_cor(y_cor) {}
+// };
+
+// struct HardBlock
+// {
+//   string name;
+//   int width, height;
+//   int downleft_x, downleft_y; 
+//   bool rotated;
+//   pin* center_pin;
   
-  HardBlock(string name, int width, int height, bool isrotate = false, pair<int, int>coor = {0,0} ):
-    name(name), width(width), height(height), isrotate(isrotate), coor(coor) {}
-};
+//   void updateInfo(int& new_width, int& new_height, int& new_x, int& new_y);
 
-struct Pin;
-struct Net
+
+//     HardBlock(string name, int width, int height, pin* center_pin, int downleft_x = 0, int downleft_y = 0):
+//       name(name), width(width), height(height), rotated(false), downleft_x(downleft_x), downleft_y(downleft_y), center_pin(center_pin) {}
+// };
+
+// struct net
+// {
+//   int degree;
+//   vector<pin*> pins;
+//   vector<HardBlock*> hardblocks;
+
+//   net(int degree = 0):degree(degree) {}
+
+//   int calHPWL();
+
+// };
+
+void HardBlock::updateInfo(int& new_width, int& new_height, int& new_x, int& new_y)
 {
-  vector<Pin*> pins;
-  int HPWL();
-};
+    
+    downleft_x = new_x;
+    downleft_y = new_y;
+    if(width == new_width && height == new_height)
+    {
+      rotated = false;
+    }  
+    else
+    {
+      rotated = true;
+    }
+    center_pin->x_cor = new_x + new_width/2;
+    center_pin->y_cor = new_y + new_height/2;
+}
 
-struct Pin
+
+
+
+int net::calHPWL()
 {
-  string name; 
-  int x, y;
+  int min_x = INT_MAX, max_x = INT_MIN;
+  int min_y = INT_MAX, max_y = INT_MIN;
+  for(const auto& pin: pins)
+  {
+    if(pin->x_cor < min_x)  min_x = pin->x_cor;
+    if(pin->x_cor > max_x)  max_x = pin->x_cor;
+    if(pin->y_cor < min_y)  min_y = pin->y_cor;
+    if(pin->y_cor > max_y)  max_y = pin->y_cor;
+  }
+  for(const auto& hb: hardblocks)
+  {
+    if(hb->center_pin->x_cor < min_x) min_x = hb->center_pin->x_cor;
+    if(hb->center_pin->x_cor > max_x) max_x = hb->center_pin->x_cor;
+    if(hb->center_pin->y_cor < min_y) min_y = hb->center_pin->y_cor;
+    if(hb->center_pin->y_cor > max_y) max_y = hb->center_pin->y_cor;
+  }
+  return (max_x - min_x) + (max_y - min_y);
 
-  Pin(string name, int x, int y):name(name), x(x), y(y) {}
-};
+}
 
-vector<HardBlock *> HBList;
-unordered_map<string, Pin*> PinMap;
-vector<Net*> NetList;
+
+// unordered_map <string, pin*>PinTable;
+vector<HardBlock*> HBList;
+unordered_map<string, HardBlock*> HBTable;
+vector<net*> NetList;
+
 
 struct TreeNode
 {
-    int type, width, height;//1 for block -1 for V, -2 for H
-    HardBlock *hardblock;
+    int type; //0:hb, -1:Vertical, -2:Horizontal
+    int width, weight;
+    HardBlock* hardblock;
     TreeNode *lchild, *rchild;
-    vector<vector<int>> shape; //record for stockmeyer
-
-    // TreeNode(int type, HardBlock* hardblock):
-    //   type(type), hardblock(hardblock), lchild(nullptr), rchild(nullptr)
-    //   {
-    //     shape = {{hardblock->width, hardblock->height, 0, 0},
-    //    {hardblock->height, hardblock->width, 1, 1}};
-    //   };
-
-    TreeNode(int type):
-    type(type), hardblock(nullptr), lchild(nullptr), rchild(nullptr){};
+    vector<tuple<int,int,pair<int,int>>> shape; // For VHnode (cut node)
     
-
-    void stockmeyer();
-};
-
-vector<int> NPE ;//0~n stands for HB , -1 stands for V cut while -2 stands for H cut
-void InitializeNPE(vector<int> &NPE);
-void Placement(vector<int> &NPE);
-void ChangeCut(vector<int> &NPE);
-bool ifSkew(vector<int> &NPE);
-bool ifBallot(vector<int> &NPE);
-
-double floor_plan_region;
-TreeNode *constructTree(vector<int> &NPE);
-int main(int argc, char *argv[])
-{
-  //TODO 1. Parser
-  // TODO 1-1: HardBlcoks
-  ifstream in_hardblock , in_net, in_pin;
-  in_hardblock.open(string(argv[1]));
-  string line;
-  string hb_name, tmp, tmp2, x1, y1, x2, y2, x3, y3, x4, y4;
-  pair<int, int> coor;
-  int width, height;
-  int x[4], y[4];
-  while(getline(in_hardblock, line))
-  {
-    if(line[0]!='s')continue;
-    stringstream ss;
-    ss.str(line);
-    while(ss >> hb_name >> tmp >> tmp2 >> x1 >> y1 >> x2 >> y2 >> x3 >> y3 >> x4 >> y4)
+    TreeNode(int type = 0, HardBlock* hardblock = nullptr):
+      type(type), hardblock(hardblock), lchild(nullptr), rchild(nullptr)
     {
-
-      x[0] = stoi(x1.substr(1, x1.size() - 2));
-      y[0] = stoi(y1.substr(0, y1.size() - 1));
-
-      x[1] = stoi(x2.substr(1, x2.size() - 2));
-      y[1] = stoi(y2.substr(0, y2.size() - 1));
-
-      x[2] = stoi(x3.substr(1, x3.size() - 2));
-      y[2] = stoi(y3.substr(0, y3.size() - 1));
-
-      x[3] = stoi(x4.substr(1, x4.size() - 2));
-      y[3] = stoi(y4.substr(0, y4.size() - 1));
-      width = *max_element(x, x+4) - *min_element(x, x+4);
-      height = *max_element(y, y+4) - *min_element(y, y+4);
-
-      coor = make_pair( *min_element(x, x+4), *min_element(y, y+4) );
-
-      // cout<<x1_<<" "<<y1_<<" "<<x2_<<" "<<y2_<<" "<<x3_<<" "<<y3_<<" "<<endl;
-      
-    }
-    HardBlock *HB = new HardBlock(hb_name, width, height, false, coor);
-    HBList.emplace_back(HB);
-
-  }
-
-  // TODO 1-2: Pins
-	in_pin.open(string(argv[3]));
-  string pin_name;
-  int pin_x, pin_y;
-  while(in_pin >> pin_name >> pin_x >> pin_y)
-  {
-    Pin *input_pin = new Pin(pin_name, pin_x, pin_y);
-    PinMap[pin_name] = input_pin;
-  }
-    
-
-  // TODO 1-3: Nets
-  in_net.open(string(argv[2]));
-  string tmp_, _, pin_name_ ;
-  int pin_degree;
-  while(in_net>>tmp_)
-  {
-    if(tmp_ == "NetDegree")
-    {
-
-      Net *input_net = new Net();
-      in_net >> _ >> pin_degree;
-      NetList.emplace_back(input_net);
-      for(int i = 0 ; i<pin_degree ; i++)
+      if(type == 0) // leaf block shape
       {
-        in_net >> pin_name_;
-        if(pin_name_[0] =='p')
-        { //push p1 p2.... into this net
-          auto fix_pin = PinMap[pin_name_];
-          NetList.back()->pins.emplace_back(fix_pin);
+        shape.emplace_back(make_tuple(hardblock->width, hardblock->height, make_pair(0,0)));
+        shape.emplace_back(make_tuple(hardblock->height, hardblock->width, make_pair(1,1)));
+      }
+    }
+    
+  void updateShape()
+  {
+    decltype(shape)().swap(shape);
+    if(type == -1)
+    {
+      sort(lchild->shape.begin(), lchild->shape.end(), [&](auto& a, auto& b) {return get<1>(a) > get<1>(b);});
+      sort(rchild->shape.begin(), rchild->shape.end(), [&](auto& a, auto& b) {return get<1>(a) > get<1>(b);});
+      int i = 0, j = 0;
+      while(i < lchild->shape.size() && j < rchild->shape.size())
+      {
+        auto cur_shape = make_tuple(get<0>(lchild->shape[i])+get<0>(rchild->shape[j]), max(get<1>(lchild->shape[i]), get<1>(rchild->shape[j])),make_pair(i,j));
+        shape.emplace_back(cur_shape);
+        if(get<1>(lchild->shape[i]) > get<1>(rchild->shape[j]))
+        {
+          ++i;
+        }
+        else if(get<1>(lchild->shape[i]) < get<1>(rchild->shape[j]))
+        {
+          ++j;
         }
         else
-        { //push hardblock's center, ex: sb0 into this net
-         Pin *hb_pin = new Pin(pin_name_, 0, 0);
-         NetList.back()->pins.emplace_back(hb_pin);
+        {
+          ++i;++j;
         }
-    
       }
-      
     }
-  }
-
-
-  //TODO 2 , initialization
-  //TODO 2-1, calculate constraint
-  int total_block_area = 0;
-  for (auto hb : HBList)
-    total_block_area += hb->height * hb->width ; 
-
-  double dead_space_ratiod = stof(string(argv[4]));
-  floor_plan_region = sqrt(total_block_area * (1+dead_space_ratiod));
-  //TODO 2-2, initialize NPE
-  InitializeNPE(NPE);
-  // for(auto c : NPE)
-  // {
-  //   cout<<c<<" ";
-  // }
-
-  auto root = constructTree(NPE);
-  while(root->lchild)
-  {
-    for(auto c : root->shape)
-    {
-       cout << c[0] << endl;
-    }
-
-    root = root->lchild;
-  }
-
-  return 0;
-
-}
-
-
-
-// 12V3V4H.....
-
-void InitializeNPE(vector<int> &NPE)
-{
-  vector<int> tmp;
-  int cur_width = 0;
-  int row_cnt = 0;
-  bool new_hb = true;
-  bool new_row = true;
-  for(int i = 0 ; i<HBList.size(); i++)
-  {
-    auto HB = HBList[i];
-    if(cur_width + HB->width <= floor_plan_region)
-    {
-      tmp.emplace_back(i);
-      if(!new_hb)
-      {
-        tmp.emplace_back(-1);
-      }
-      cur_width += HB->width;
-      new_hb = false;
-    }
-
     else
     {
-      NPE.insert(NPE.end(), tmp.begin(), tmp.end());
-      tmp.clear();
-      tmp.emplace_back(i);
-      cur_width = HB->width;
-      if(!new_row)
+      sort(lchild->shape.begin(), lchild->shape.end(), [&](auto& a, auto& b) {return get<0>(a) > get<0>(b);});
+      sort(rchild->shape.begin(), rchild->shape.end(), [&](auto& a, auto& b) {return get<0>(a) > get<0>(b);});
+      int i = 0, j = 0;
+      while(i < lchild->shape.size() && j < rchild->shape.size())
       {
+        auto cur_shape = make_tuple(max(get<0>(lchild->shape[i]),get<0>(rchild->shape[j])), get<1>(lchild->shape[i])+get<1>(rchild->shape[j]), make_pair(i,j));
+        shape.emplace_back(cur_shape);
+        if(get<0>(lchild->shape[i]) > get<0>(rchild->shape[j]))
+        {
+          ++i;
+        }
+        else if(get<0>(lchild->shape[i]) < get<0>(rchild->shape[j]))
+        {
+          ++j;
+        }
+        else
+        {
+          ++i;++j;
+        }
+      }
+    }
+  }
+};
+
+
+void WriteResult(string filename, int WL)
+{
+  ofstream output(filename);
+
+  output << "Wirelength " << WL << "\n";
+  output << "Blocks" << "\n";
+  for(auto& hb:HBList)
+  {
+    output << hb->name << " " << hb->downleft_x << " " << hb->downleft_y << " " << hb->rotated << "\n"; 
+  }
+}
+
+
+
+class SA
+{ 
+  private:
+    double region_side_len;
+    void CalSideLen(double& dead_space_ratio)
+    {
+      double total_area = 0;
+      for(const auto& hb: HBList)
+      {
+        int w = hb->width, h = hb->height;
+        total_area += (w * h);
+      }
+      region_side_len = sqrt(total_area * (1+dead_space_ratio));
+    }
+
+    template<class T>
+    void SWAP(T& a, T& b) // "perfect swap" (almost)
+{
+  T tmp {move(a)}; // move from a
+  a = move(b); // move from b
+  b = move(tmp); // move from tmp
+}
+    
+    void InitNPE(vector<int>& NPE)
+    {
+      vector<int> row;
+      deque<vector<int>> rows;
+      int cur_width = HBList[0]->width;
+      row.emplace_back(0);
+      int placedBlock = 1;
+      for(int i = 1; i < HBList.size(); ++i)
+      {
+        auto curHB = HBList[i];
+        if(cur_width + curHB->width <= region_side_len)
+        {
+          row.emplace_back(i);
+          cur_width += curHB->width;
+          row.emplace_back(-1);
+        }
+        else
+        {
+          rows.emplace_back(row);
+          decltype(row)().swap(row);
+
+          row.emplace_back(i);
+          cur_width = curHB->width;
+        }
+      }
+      rows.emplace_back(row);
+
+      for(auto& row_i: rows[0])
+      {
+        NPE.emplace_back(row_i);
+      }
+      rows.pop_front();
+      //NPE.emplace_back(-2);
+
+      for(auto& row:rows)
+      {
+        for(auto& row_i:row)
+        {
+          NPE.emplace_back(row_i);
+        }
         NPE.emplace_back(-2);
       }
-      new_row = false;
-      
     }
-  }
-  NPE.insert(NPE.end(), tmp.begin(), tmp.end());
-  NPE.emplace_back(-2);
-}
-
-
-void Placement(vector<int> &NPE)
-{
-  unordered_map<string, pair<int, int>> tmp;
-  int cor_x = 0, cor_y = 0;
-  int height_max = INT_MIN;
-  pair<int, int>cur_coor = make_pair(0, 0);
-  for(int i = 0 ; i<NPE.size()-1 ; i++)
-  {
-    if(NPE[i]!=-1 && NPE[i]!= -2)
+    void Complement(vector<int>& curNPE, int startIdx)
     {
-      auto HB = HBList[NPE[i]];      
-      cur_coor.first += HB->width;
-      if(HB->height > height_max) height_max = HB->height;
-      tmp[HB->name] = cur_coor;
-    }
-    if(NPE[i]==-2)
-    {
-      cur_coor.first = 0;
-      cur_coor.second = height_max;
-      height_max = INT_MIN;
-    }
-
-  
-  }
-  // for(auto name : tmp)
-  //   cout<<"name : "<<name.first<<" x : "<<name.second.first<<"y : "<<name.second.second<<endl;
-
-}
-
-
-void ChangeCut(vector<int> &NPE)
-{
-  for(int i = 0 ; i<NPE.size(); i++)
-  {
-    if(NPE[i]==-1)NPE[i]=-2;
-    if(NPE[i]==-2)NPE[i]=-1;
-  }
-}
-
-
-bool ifSkew(vector<int> &NPE)
-{
-  for(int i = 1 ; i<NPE.size() ; i++)
-  {
-    if( NPE[i] == NPE[i-1] ||  NPE[i] == NPE[i+1])
-      return false;
-  }
-  return true;
-
-}
-
-bool ifBallot(vector<int> &NPE)
-{
-  int operand = 0 ;
-  int operators = 0 ;
-
-  for(auto n : NPE)
-  {
-    if(n==-1 || n==-2)operators++;
-    else operand++;
-  }
-  if(operand< operators)return false;
-  return true;
-  
-}
-
-
-TreeNode *constructTree(vector<int> &NPE)
-{
-  vector<TreeNode *>postorder;
-  for(int block : NPE)
-  {
-    if(block >=0)// if block is hardblock then push
-    {
-      auto *hb = HBList[block];
-      TreeNode *node = new TreeNode(0); // 0 means this node is an hardblock
-      node->shape  = {{hb->width, hb->height, 0, 0},{hb->height, hb->width, 1, 1}};//build the node for stockmeyer
-      postorder.push_back(node);
-    }
-
-    else//if block is V/H then pop and run stockmeyer
-    {
-      TreeNode *CutNode = new TreeNode(block);
-      CutNode->type = block;
-      
-      auto Rnode = postorder.back();
-      postorder.pop_back();
-      CutNode->rchild = Rnode;
-
-      auto Lnode = postorder.back();
-      postorder.pop_back();
-      CutNode->lchild = Lnode;
-
-      postorder.push_back(CutNode);
-      CutNode->stockmeyer();
-    }
-  }
-  return postorder.back();
-}
-
-
-void TreeNode::stockmeyer()
-{
-  int i, j;
-  //when we implement the tree, check whether the node is CUT or HARDBLOCK.
-  //if the block is CUT then we implemnt the STOCKMEYER algorithm to update our shape
-  // -1 means VERTICAL cut while -2 means HORIZONTAL
-  vector<int> tmp;
-  if(type==-1)
-  {
-    i = 0;
-    j = 0;
-    sort(lchild->shape.begin(), lchild->shape.end());  // without assign lamda function it will sort by the first element 
-    sort(rchild->shape.begin(), rchild->shape.end());
-    // cout<<"lchild : "<<lchild->shape.size()<<"rchild : "<<rchild->shape.size()<<endl;
-    while (i< lchild->shape.size() && j < rchild->shape.size())
-    {
-      tmp = {lchild->shape[i][0] + rchild->shape[i][0], max(lchild->shape[i][1], rchild->shape[i][1]), i, j};
-      shape.emplace_back(tmp);
-      if(lchild->shape[i][0] > rchild->shape[i][0]) i ++;
-      else if (lchild->shape[i][0] < rchild->shape[i][0]) j++;
-      else i++;j++;
+      for(int i = startIdx; i < curNPE.size(); ++i)
+      {
+        if(curNPE[i] == -1) curNPE[i] = -2;
+        else if(curNPE[i] == -2)  curNPE[i] = -1;
+        else break;
+      }
     }
     
-  }
 
-  else
-  {
-    i = 0;
-    j = 0;
-    sort(lchild->shape.begin(), lchild->shape.end(), greater<>());  // without assign lamda function it will sort by the first element 
-    sort(rchild->shape.begin(), rchild->shape.end(), greater<>());  // sort by decending order.
-    while (i<lchild->shape.size() && j < rchild->shape.size())
+
+    bool isSkewed(vector<int>& curNPE, int i)
     {
-      tmp = {lchild->shape[i][0] + rchild->shape[i][0], max(lchild->shape[i][1], rchild->shape[i][1]), i, j};
-      shape.emplace_back(tmp);
-      if(lchild->shape[i][0] > rchild->shape[i][0]) i ++;
-      else if (lchild->shape[i][0] < rchild->shape[i][0]) j++;
-      else i++;j++;
+
+      if(i-1 >= 0 && curNPE[i-1] == curNPE[i+1])
+      {
+        return false;
+      }
+      else if(i+2 < curNPE.size() && curNPE[i] == curNPE[i+2])
+      {
+        return false;
+      }
+      return true;
+    }
+    
+    bool isBallot(vector<int>& curNPE, int i)
+    {
+
+      if(curNPE[i] >= 0)
+      {
+        int N = 0;
+        for(int k = 0; k <= i+1; ++k)
+        {
+          if(curNPE[i] == -1 || curNPE[i] == -2)  ++N;
+          if(2 * N < i) return false;
+        }
+      }
+      return true;
     }
 
-  }
+    
+    vector<int> Perturb(vector<int> curNPE, int M)
+  {
+    switch(M)
+    {
+      case 0:
+      {
+        vector<int> SwapPos;
+        for(int i = 0; i < curNPE.size(); ++i)
+        {
+          if (curNPE[i] >= 0)
+            SwapPos.emplace_back(i);
+        }
+        int n = SwapPos.size();
 
+        
+        // Change to pick two random hardblock for swapping
+        int swap_pos1,swap_pos2;
+        swap_pos1 = swap_pos2 = rand() % n;
+        while(swap_pos1 == swap_pos2) swap_pos2 = rand() % n;
+        swap_pos1 = SwapPos[swap_pos1];
+        swap_pos2 = SwapPos[swap_pos2];
+
+        SWAP(curNPE[swap_pos1], curNPE[swap_pos2]);
+        break;
+      }
+      case 1:
+      {
+        vector<int> InverseStartPos;
+        for(int i = 0; i < curNPE.size()-1; ++i)
+          if(curNPE[i] >= 0 && curNPE[i+1] < 0)
+              InverseStartPos.emplace_back(i+1);
+        int n = InverseStartPos.size();
+        int StartIdx = rand() % n;
+        StartIdx = InverseStartPos[StartIdx];
+        Complement(curNPE, StartIdx);
+        break;
+      }
+      case 2:
+      { 
+        vector<int> SwapPos;
+        for(int i = 0; i < curNPE.size()-1; ++i)
+        {
+          if(curNPE[i] >= 0 && curNPE[i+1] < 0)
+          {
+            if(isSkewed(curNPE, i) && isBallot(curNPE, i))
+            {
+              SwapPos.emplace_back(i);
+            }
+          }
+          else if(curNPE[i] < 0 && curNPE[i+1] >= 0)
+          {
+            if(isSkewed(curNPE, i))
+            {
+              SwapPos.emplace_back(i);
+            }
+          }
+        }
+        int n = SwapPos.size();
+        if(n != 0)
+        {
+          int r = rand() % n;
+          int SwapIdx = SwapPos[r];
+          // cout << "SwapIdx = " << SwapIdx << endl;
+          SWAP(curNPE[SwapIdx], curNPE[SwapIdx+1]);
+        }
+        break;
+      }
+    }
+    return curNPE;
+  }
+    
+    TreeNode* ConstructTree(vector<int>& NPE)
+    {
+      vector<TreeNode*> st;
+      for(auto element:NPE)
+      {
+        if(element >= 0)
+        {
+          string hbNode_name = "sb"+ to_string(element);
+          HardBlock* hb = HBTable[hbNode_name];
+          TreeNode* hbNode = new TreeNode(0, hb);
+          st.emplace_back(hbNode);
+        }
+        else
+        {
+          TreeNode* VHnode = new TreeNode(element);
+          TreeNode* Rnode = st.back(); st.pop_back();
+          VHnode->rchild = Rnode;
+          TreeNode* Lnode = st.back(); st.pop_back();
+          VHnode->lchild = Lnode;
+          st.emplace_back(VHnode);
+          VHnode->updateShape();
+        }
+      }
+      return st.back(); // root
+    }
+    void PlaceBlock(TreeNode* node, int shapeIdx, int x, int y)
+    {
+      if(node->type == 0)
+      {
+        node->hardblock->updateInfo(get<0>(node->shape[shapeIdx]), get<1>(node->shape[shapeIdx]), x, y);
+      }
+      else
+      {
+        PlaceBlock(node->lchild, get<2>(node->shape[shapeIdx]).first, x, y);
+        int displacementX = 0, displacementY = 0;
+        if(node->type == -1)
+        {
+          displacementX = get<0>(node->lchild->shape[get<2>(node->shape[shapeIdx]).first]);
+        }
+        else
+        {
+          displacementY = get<1>(node->lchild->shape[get<2>(node->shape[shapeIdx]).first]);
+        }
+        PlaceBlock(node->rchild, get<2>(node->shape[shapeIdx]).second, x+displacementX, y+displacementY);
+      }
+    }
+    
+    int CalTotalHPWL()
+{
+  int totalHPWL = 0;
+  for(auto& net: NetList)
+  {
+    totalHPWL += net->calHPWL();
+  }
+  return totalHPWL;
+}
+    int CalCost(vector<int>& NPE, bool const& forWL)
+    {
+      TreeNode* root = ConstructTree(NPE);
+      int min_out_area = INT_MAX, out_of_range_area = 0, shapeIdx = 0;
+      for(int i = 0; i < root->shape.size(); ++i)
+      {
+        auto info = root->shape[i];
+        int cur_width = get<0>(info), cur_height = get<1>(info);
+        if(cur_width > region_side_len && cur_height > region_side_len)
+        {
+          out_of_range_area = cur_width * cur_height - pow(region_side_len,2);
+        }
+        else if(cur_height > region_side_len)
+        {
+          out_of_range_area = cur_width * (cur_height - region_side_len);
+        }
+        else if(cur_width > region_side_len)
+        {
+          out_of_range_area= cur_height * (cur_width - region_side_len);
+        }
+        else
+        {
+          out_of_range_area = 0;
+        }
+        // Pick 1st shape which is within the region due to time-saving.
+        // But it might not be the min-area-shape of all the qualified shape. 
+        if(out_of_range_area < min_out_area)
+        {
+          min_out_area = out_of_range_area;
+          shapeIdx = i;
+        }
+      }
+
+      if(forWL == false)  return min_out_area * 10;
+
+      PlaceBlock(root, shapeIdx, 0, 0);
+
+      return min_out_area * 10 + CalTotalHPWL();
+    }
+    void SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int>& initNPE, vector<int>& bestNPE)
+    {
+      bestNPE = initNPE;
+      int MT, uphill, reject; MT = uphill = reject = 0;
+      int N = k * HBList.size();
+      vector<int> curNPE = initNPE;
+      int cur_cost = CalCost(curNPE, forWL);
+      int best_cost = cur_cost;
+      if(best_cost == 0)
+      { 
+        CalCost(bestNPE, true); return; 
+      }
+      // mt19937 random_number_generator(random_device{}());
+      // uniform_int_distribution<> rand_move(1, 3);
+      // uniform_real_distribution<> rand_prob(0, 1);
+      do
+      {
+        double T0 = 1000;
+        do
+        {
+          MT = uphill = reject = 0;
+          do
+          {
+            // int M = rand_move(random_number_generator);
+            // int M = rand() % 3;
+            int M = 0;
+            if(forWL == false)  M = rand() % 3;
+            vector<int> tryNPE = Perturb(curNPE, M);
+            MT += 1;
+            int try_cost = CalCost(tryNPE, forWL);
+            int delta_cost = try_cost - cur_cost;
+            if(delta_cost < 0 || (double)rand()/RAND_MAX < exp(-1*delta_cost/T0))
+            {
+              if(delta_cost > 0) { uphill += 1; }
+              curNPE = tryNPE;
+              cur_cost = try_cost; 
+              if(cur_cost < best_cost)
+              {
+                bestNPE = curNPE;
+                best_cost = cur_cost;
+                if(best_cost == 0)
+                { 
+                  CalCost(bestNPE, true); return; 
+                }
+              }
+            }
+            else
+            {
+              reject += 1;
+            }
+          }while(uphill <= N && MT <= 2*N);
+          T0 = r * T0;
+        }while(reject/MT <= 0.95 && T0 >= epsilon);
+      }while (forWL == false);
+      CalCost(bestNPE, true); return; 
+    }
+
+  public:
+    SA(double dead_space_ratio) { CalSideLen(dead_space_ratio); }
+    int Run()
+{
+  unsigned seed = 2;
+  srand(seed);
+
+  vector<int> initNPE, bestNPE, finalNPE;
+  InitNPE(initNPE);
+  SAfloorplanning(0.1, 0.9, 10, false, initNPE, bestNPE);
+  cout << "Find a feasible floorplan.\n" << "Total wirelength: " << CalTotalHPWL() << "\n";
+
+  finalNPE = bestNPE;
+  cout<<"start for HPWL : "<<endl;
+  SAfloorplanning(1, 0.95, 5, true, bestNPE, finalNPE);
+  int finalWL = CalTotalHPWL();
+  cout << "Find a better floorplan.\n" << "Total wirelength: " << finalWL << "\n";
+
+  return finalWL;
+}
+
+};
+
+
+
+
+
+// class Parser
+// {
+//   public:
+//     void read_hardblock(string const &filename)
+//     {
+//       ifstream in_hardblock(filename);
+//       string s;
+//       int width, height;
+//       int x[4], y[4];
+//       while(getline(in_hardblock, s))
+//       {
+//         if(s == "" || s[0] != 's') continue;
+//         stringstream ss(s);
+//         string hb_name, tmp1, tmp2, x0, y0, x1, y1, x2, y2, x3, y3;
+
+//         while(ss >> hb_name >> tmp1 >> tmp2 >> x0 >> y0 >> x1 >> y1 >> x2 >> y2 >> x3 >> y3)
+//         {
+//             x[0] = stoi(x0.substr(1, x0.size() - 2));
+//             y[0] = stoi(y0.substr(0, y0.size() - 1));
+
+//             x[1] = stoi(x1.substr(1, x1.size() - 2));
+//             y[1] = stoi(y1.substr(0, y1.size() - 1));
+
+//             x[2] = stoi(x2.substr(1, x2.size() - 2));
+//             y[2] = stoi(y2.substr(0, y2.size() - 1));
+
+//             x[3] = stoi(x3.substr(1, x3.size() - 2));
+//             y[3] = stoi(y3.substr(0, y3.size() - 1));
+//             width = *max_element(x, x+4) - *min_element(x, x+4);
+//             height = *max_element(y, y+4) - *min_element(y, y+4);
+
+//             int center_x = *min_element(x, x+4) + width/2;
+//             int center_y = *min_element(y, y+4) + height/2;
+//             pin* center_pin = new pin(hb_name, center_x, center_y);
+//             HardBlock *HB = new HardBlock(hb_name, width, height, center_pin, x[0], y[0]);
+//             HBList.emplace_back(HB);
+//             HBTable[hb_name] = HB;
+//             PinTable[hb_name] = HB->center_pin;
+//         }
+//       }
+//     }
+
+
+//     void read_net(string const &filename)
+//     {
+//       ifstream fin_pl(filename);
+//       string pin_name;
+//       int x_cor, y_cor;
+//       while(fin_pl >> pin_name >> x_cor >> y_cor)
+//       {
+//       pin *cur_pin = new pin(pin_name, x_cor, y_cor);
+//       PinTable[pin_name] = cur_pin;
+//       }
+//     }
+
+    
+//     void read_pin(string const &filename)
+//     {
+
+//         ifstream fin_nets(filename);
+//         string tmp;
+//         while(getline(fin_nets, tmp))
+//         {
+//           if(tmp[3] != 'D') continue;
+//           stringstream ss(tmp);
+//           string temp, colon;
+//           int degree;
+//           while(ss >> temp >> colon >> degree)
+//           {
+//               net *cur_net = new net(degree);
+//               NetList.emplace_back(cur_net);
+//               for(int i = 0; i < degree; ++i)
+//               {
+//                 string terminal;
+//                 fin_nets >> terminal;
+//                 if(terminal[0] == 'p')
+//                 { 
+//                     auto fixed_pin = PinTable[terminal];
+//                     NetList.back()->pins.emplace_back(fixed_pin);
+//                 }
+//                 else
+//                 {
+//                     auto hb_pin = HBTable[terminal];
+//                     NetList.back()->hardblocks.emplace_back(hb_pin);
+//                 }
+//               }
+//           }
+//         }
+//     }
+
+// };
+
+
+int main(int argc, char *argv[])
+{
+    parser *par = new parser();
+    par->read_hardblock(argv[1]);
+    par->read_net(argv[3]);
+    par->read_pin(argv[2]);
+
+    
+
+    SA sa(stod(argv[5]));
+    int finalWL = sa.Run();
+
+    WriteResult(argv[4], finalWL);
+
+    return 0;
 }

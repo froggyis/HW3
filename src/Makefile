@@ -5,7 +5,7 @@ SOURCES = main.cpp
 EXECUTABLE = ../bin/hw3
 
 all:
-	$(CC) $(CFLAGS) $(SOURCES) -o $(EXECUTABLE)
+	$(CC) $(CFLAGS) $(SOURCES) parser.cpp -o $(EXECUTABLE) -O3
 
 clean:
 	rm -rf  $(EXECUTABLE)
