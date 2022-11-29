@@ -1,11 +1,12 @@
-CC =g++
-CFLAGS = -std=c++14
-LIBS = -lm -lsystemc
-SOURCES = main.cpp
-EXECUTABLE = ../bin/hw3
+CC = g++
+OPT = -O3
+# LIBS = -static-libstdc++
+LIBS = -std=c++17
 
-all:
-	$(CC) $(CFLAGS) $(SOURCES) parser.cpp -o $(EXECUTABLE) -O3
+all: main
+
+main: main.cpp
+	$(CC) -o ../bin/hw3 main.cpp ./Module/module.cc ./SAfloorplan/sa.cc ./Parser/Parser.cpp $(OPT) $(LIBS)
 
 clean:
-	rm -rf  $(EXECUTABLE)
+	rm -f ../bin/hw3
