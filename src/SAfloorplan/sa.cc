@@ -11,7 +11,38 @@ using namespace std;
 extern vector<HardBlock*> HBList;
 extern unordered_map<string, HardBlock*> HBTable;
 extern vector<net*> NetList;
+extern vector<TreeNode*> CutNodes;
 
+
+bool checkSkewed(std::vector<int> const &npe, size_t const &pos)
+{
+    if (npe[pos + 1] < 0 && pos != 0)
+    {
+        if (npe[pos - 1] != npe[pos + 1])
+            return true;
+    }
+    else if (npe[pos] < 0 && pos + 1 != npe.size() - 1)
+    {
+        if (npe[pos] != npe[pos + 2])
+            return true;
+    }
+    return false;
+}
+
+bool checkBallot(std::vector<int> const &npe, size_t const &pos)
+{
+    if (npe[pos + 1] < 0)
+    {
+        size_t op = 0;
+        for (size_t i = 0; i <= pos + 1; ++i)
+            if (npe[i] < 0)
+                op += 1;
+
+        if (2 * op >= pos + 1)
+            return false;
+    }
+    return true;
+}
 
 
 void SA::InitNPE(vector<int>& NPE)
@@ -91,6 +122,7 @@ bool SA::violateBallot(vector<int>& curNPE, int i)
     if(2 * N < i+1) return false;
   }
   return true;
+
 }
 
 vector<int> SA::Perturb(vector<int> curNPE, int M)
@@ -162,51 +194,90 @@ vector<int> SA::Perturb(vector<int> curNPE, int M)
       // break;
     }
     case 2:
-    { 
-      // vector<int> SwapPos;
+       { 
+      vector<int> SwapPos;
       for(int i = 0; i < curNPE.size()-1; ++i)
       {
         if(curNPE[i] >= 0 && curNPE[i+1] < 0)
-          if(isSkewed(curNPE, i) && !violateBallot(curNPE, i))tmp.emplace_back(i);
-          
-
+        {
+          if(isSkewed(curNPE, i) && !violateBallot(curNPE, i))
+          {
+            SwapPos.emplace_back(i);
+          }
+        }
         else if(curNPE[i] < 0 && curNPE[i+1] >= 0)
-          if(isSkewed(curNPE, i))tmp.emplace_back(i);
-          
+        {
+          if(isSkewed(curNPE, i))
+          {
+            SwapPos.emplace_back(i);
+          }
+        }
       }
-      if(tmp.size() != 0)
+      int n = SwapPos.size();
+      if(n != 0)
       {
-        int r = rand() % tmp.size();
-        int SwapIdx = tmp[r];
+        int r = rand() % n;
+        int SwapIdx = SwapPos[r];
+        // cout << "SwapIdx = " << SwapIdx << endl;
         swap(curNPE[SwapIdx], curNPE[SwapIdx+1]);
       }
       break;
     }
+  //   int pos[curNPE.size()], posCnt = 0, pos1 = 0, pos2 = 0, violationCnt = 0;
+  //     for (size_t i = 0; i < curNPE.size() - 1; ++i)
+  //       if ((curNPE[i] >= 0 && curNPE[i + 1] < 0) ||
+  //           (curNPE[i] < 0 && curNPE[i + 1] >= 0))
+  //           pos[posCnt++] = i;
+
+  //   do
+  //   {
+  //       pos1 = rand() % posCnt;
+  //       violationCnt += 1;
+  //   } while ((checkSkewed(curNPE, pos[pos1]) && checkBallot(curNPE, pos[pos1])) == false && violationCnt < posCnt);
+
+  //   if (violationCnt < posCnt)
+  //   {
+  //       pos1 = pos[pos1];
+  //       pos2 = pos1 + 1;
+  //       swap(curNPE[pos1], curNPE[pos2]);
+  //   }
+  //   break;
+  // }
   }
   return curNPE;
+  
 }
 
 TreeNode* SA::ConstructTree(vector<int>& NPE)
 {
+  int cutIdx = 0;
   vector<TreeNode*> st;
-  for(auto element:NPE)
+  for(auto &element:NPE)
   {
     if(element >= 0)
     {
-      string hbNode_name = "sb"+ to_string(element);
-      HardBlock* hb = HBTable[hbNode_name];
-      TreeNode* hbNode = new TreeNode(0, hb);
-      st.emplace_back(hbNode);
+      // string hbNode_name = "sb"+ to_string(element);
+      // HardBlock* hb = HBTable[hbNode_name];
+      // TreeNode* hbNode = new TreeNode(0, hb);
+      // st.emplace_back(hbNode);
+      st.emplace_back(hbNodeList[element]);
     }
     else
     {
-      TreeNode* VHnode = new TreeNode(element);
-      TreeNode* Rnode = st.back(); st.pop_back();
-      VHnode->rchild = Rnode;
-      TreeNode* Lnode = st.back(); st.pop_back();
-      VHnode->lchild = Lnode;
-      st.emplace_back(VHnode);
-      VHnode->updateShape();
+      auto node = cutNodeList[cutIdx++];
+      node->type = element;
+      node->rchild = st.back();
+      st.pop_back();
+      node->lchild = st.back();
+      st.pop_back();
+      st.emplace_back(node);
+      // TreeNode* VHnode = new TreeNode(element);
+      // TreeNode* Rnode = st.back(); st.pop_back();
+      // VHnode->rchild = st.back();st.pop_back();
+      // TreeNode* Lnode = st.back(); st.pop_back();
+      // VHnode->lchild = st.back();st.pop_back();
+      // st.emplace_back(VHnode);
+      node->updateShape();
     }
   }
   return st.back(); // root
@@ -216,21 +287,31 @@ void SA::PlaceBlock(TreeNode* node, int shapeIdx, int x, int y)
 {
   if(node->type == 0)
   {
-    node->hardblock->updateInfo(get<0>(node->shape[shapeIdx]), get<1>(node->shape[shapeIdx]), x, y);
+    // node->hardblock->updateInfo(get<0>(node->shape[shapeIdx]), get<1>(node->shape[shapeIdx]), x, y);
+    node->hardblock->updateInfo(node->shape[shapeIdx][0], node->shape[shapeIdx][1], x, y);
+
   }
   else
   {
-    PlaceBlock(node->lchild, get<2>(node->shape[shapeIdx]).first, x, y);
+    // PlaceBlock(node->lchild, get<2>(node->shape[shapeIdx]).first, x, y);
+    PlaceBlock(node->lchild, node->shape[shapeIdx][2], x, y);
+
     int displacementX = 0, displacementY = 0;
     if(node->type == -1)
     {
-      displacementX = get<0>(node->lchild->shape[get<2>(node->shape[shapeIdx]).first]);
+      // displacementX = get<0>(node->lchild->shape[get<2>(node->shape[shapeIdx]).first]);
+      displacementX = node->lchild->shape[   node->shape[shapeIdx][2]    ][0];
+
     }
     else
     {
-      displacementY = get<1>(node->lchild->shape[get<2>(node->shape[shapeIdx]).first]);
+      // displacementY = get<1>(node->lchild->shape[get<2>(node->shape[shapeIdx]).first]);
+      displacementY = node->lchild->shape[   node->shape[shapeIdx][2]    ][1];
+
     }
-    PlaceBlock(node->rchild, get<2>(node->shape[shapeIdx]).second, x+displacementX, y+displacementY);
+    // PlaceBlock(node->rchild, get<2>(node->shape[shapeIdx]).second, x+displacementX, y+displacementY);
+    PlaceBlock(node->rchild, node->shape[shapeIdx][3], x+displacementX, y+displacementY);
+
   }
 }
 
@@ -251,7 +332,9 @@ int SA::CalCost(vector<int>& NPE, bool const& forWL)
   for(int i = 0; i < root->shape.size(); ++i)
   {
     auto info = root->shape[i];
-    int cur_width = get<0>(info), cur_height = get<1>(info);
+    // int cur_width = get<0>(info), cur_height = get<1>(info);
+    int cur_width = info[0];
+    int cur_height = info[1];
     if(cur_width > region_side_len && cur_height > region_side_len)
     {
       out_of_range_area = cur_width * cur_height - pow(region_side_len,2);
@@ -296,9 +379,6 @@ void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int
   { 
     CalCost(bestNPE, true); return; 
   }
-  // mt19937 random_number_generator(random_device{}());
-  // uniform_int_distribution<> rand_move(1, 3);
-  // uniform_real_distribution<> rand_prob(0, 1);
   do
   {
     double T0 = 1000;
@@ -307,8 +387,6 @@ void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int
       MT = uphill = reject = 0;
       do
       {
-        // int M = rand_move(random_number_generator);
-        // int M = rand() % 3;
         int M = 0;
         if(forWL == false)  M = rand() % 3;
         vector<int> tryNPE = Perturb(curNPE, M);
@@ -336,7 +414,7 @@ void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int
         }
       }while(uphill <= N && MT <= 2*N);
       T0 = r * T0;
-      // if(forWL)cout<<T0<<endl;
+      if(forWL)cout<<T0<<endl;
     }while(reject/MT <= 0.95 && T0 >= epsilon);
   }while (forWL == false);
   CalCost(bestNPE, true); return; 
@@ -353,7 +431,7 @@ int SA::Run()
   cout << "Find a feasible floorplan.\n" << "Total wirelength: " << CalTotalHPWL() << "\n";
 
   finalNPE = bestNPE;
-  SAfloorplanning(10, 0.9, 5, true, bestNPE, finalNPE);//set the parameter so can debug fast, need to adjust for better solution.
+  SAfloorplanning(10, 0.75, 5, true, bestNPE, finalNPE);//set the parameter so can debug fast, need to adjust for better solution.
   int finalWL = CalTotalHPWL();
   cout << "Find a better floorplan.\n" << "Total wirelength: " << finalWL << "\n";
 

@@ -50,35 +50,66 @@ void Parser::read_hardblock(string const &filename)
 
 void Parser::read_net(string const &filename)
 {
-    ifstream fin_nets(filename);
-    string tmp;
-    while(getline(fin_nets, tmp))
+    
+    ifstream in_net(filename);
+    string tmp,_,pin_name_;
+    string tmp_;
+    // string tmp_, _, pin_name_ ;
+    int pin_degree;
+    while(in_net>>tmp_)
     {
-        if(tmp[3] != 'D') continue;
-        stringstream ss(tmp);
-        string temp, colon;
-        int degree;
-        while(ss >> temp >> colon >> degree)
+        if(tmp_ == "NetDegree")
         {
-            net *cur_net = new net(degree);
-            NetList.emplace_back(cur_net);
-            for(int i = 0; i < degree; ++i)
+            net *input_net = new net();
+            in_net >> _ >> pin_degree;
+            NetList.emplace_back(input_net);
+            for(int i = 0 ; i<pin_degree ; i++)
             {
-            string terminal;
-            fin_nets >> terminal;
-            if(terminal[0] == 'p')
-            { 
-                auto fixed_pin = PinTable[terminal];
-                NetList.back()->pins.emplace_back(fixed_pin);
-            }
-            else
-            {
-                auto hb_pin = HBTable[terminal];
+                in_net >> pin_name_;
+                if(pin_name_[0] =='p')
+                { //push p1 p2.... into this net
+                    auto fix_pin = PinTable[pin_name_];
+                    NetList.back()->pins.emplace_back(fix_pin);
+                }
+                else
+                { //push hardblock's center, ex: sb0 into this net
+                auto hb_pin = HBTable[pin_name_];
                 NetList.back()->hardblocks.emplace_back(hb_pin);
+                }
+            
             }
-            }
+    
         }
     }
+
+
+    // while(getline(in_net, tmp))
+    // {
+    //     if(tmp[3] != 'D') continue;
+    //     stringstream ss(tmp);
+    //     string temp, colon;
+    //     int degree;
+    //     while(ss >> temp >> colon >> degree)
+    //     {
+    //         net *cur_net = new net(degree);
+    //         NetList.emplace_back(cur_net);
+    //         for(int i = 0; i < degree; ++i)
+    //         {
+    //         string terminal;
+    //         fin_nets >> terminal;
+    //         if(terminal[0] == 'p')
+    //         { 
+    //             auto fixed_pin = PinTable[terminal];
+    //             NetList.back()->pins.emplace_back(fixed_pin);
+    //         }
+    //         else
+    //         {
+    //             auto hb_pin = HBTable[terminal];
+    //             NetList.back()->hardblocks.emplace_back(hb_pin);
+    //         }
+    //         }
+    //     }
+    // }
   
 }
 
@@ -86,10 +117,10 @@ void Parser::read_net(string const &filename)
 void Parser::read_pin(string const &filename)
 {
 
-    ifstream fin_pl(filename);
+    ifstream in_pin(filename);
     string pin_name;
     int x_cor, y_cor;
-    while(fin_pl >> pin_name >> x_cor >> y_cor)
+    while(in_pin >> pin_name >> x_cor >> y_cor)
     {
         pin *cur_pin = new pin(pin_name, x_cor, y_cor);
         PinTable[pin_name] = cur_pin;

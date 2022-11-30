@@ -41,15 +41,17 @@ struct TreeNode
     int width, weight;
     HardBlock* hardblock;
     TreeNode *lchild, *rchild;
-    vector<tuple<int,int,pair<int,int>>> shape; // For VHnode (cut node)
-    
+    // vector<tuple<int,int,pair<int,int>>> shape; // For VHnode (cut node)
+    vector<vector<int>> shape;
     TreeNode(int type = 0, HardBlock* hardblock = nullptr):
       type(type), hardblock(hardblock), lchild(nullptr), rchild(nullptr)
     {
       if(type == 0) // leaf block shape
       {
-        shape.emplace_back(make_tuple(hardblock->width, hardblock->height, make_pair(0,0)));
-        shape.emplace_back(make_tuple(hardblock->height, hardblock->width, make_pair(1,1)));
+        // shape.emplace_back(make_tuple(hardblock->width, hardblock->height, make_pair(0,0)));
+        // shape.emplace_back(make_tuple(hardblock->height, hardblock->width, make_pair(1,1)));
+        shape = {{hardblock->width, hardblock->height, 0, 0}, 
+        {hardblock->height, hardblock->width, 1,1}};
       }
     }
     void updateShape();

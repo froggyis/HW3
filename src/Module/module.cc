@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <climits>
+#include <iostream>
 #include "module.h"
 
 void HardBlock::updateInfo(int& new_width, int& new_height, int& new_x, int& new_y)
@@ -44,18 +45,18 @@ void TreeNode::updateShape()
   decltype(shape)().swap(shape);
   if(type == -1)
   {
-    sort(lchild->shape.begin(), lchild->shape.end(), [&](auto& a, auto& b) {return get<1>(a) > get<1>(b);});
-    sort(rchild->shape.begin(), rchild->shape.end(), [&](auto& a, auto& b) {return get<1>(a) > get<1>(b);});
+    sort(lchild->shape.begin(), lchild->shape.end() );
+    sort(rchild->shape.begin(), rchild->shape.end() );
     int i = 0, j = 0;
     while(i < lchild->shape.size() && j < rchild->shape.size())
     {
-      auto cur_shape = make_tuple(get<0>(lchild->shape[i])+get<0>(rchild->shape[j]), max(get<1>(lchild->shape[i]), get<1>(rchild->shape[j])),make_pair(i,j));
+      auto cur_shape = {lchild->shape[i][0]+rchild->shape[j][0], max( lchild->shape[i][1] , rchild->shape[j][1]), i, j};
       shape.emplace_back(cur_shape);
-      if(get<1>(lchild->shape[i]) > get<1>(rchild->shape[j]))
+      if(lchild->shape[i][1] > rchild->shape[j][1] )
       {
         ++i;
       }
-      else if(get<1>(lchild->shape[i]) < get<1>(rchild->shape[j]))
+      else if( lchild->shape[i][1] < rchild->shape[j][1])
       {
         ++j;
       }
@@ -67,18 +68,18 @@ void TreeNode::updateShape()
   }
   else
   {
-    sort(lchild->shape.begin(), lchild->shape.end(), [&](auto& a, auto& b) {return get<0>(a) > get<0>(b);});
-    sort(rchild->shape.begin(), rchild->shape.end(), [&](auto& a, auto& b) {return get<0>(a) > get<0>(b);});
+    sort(lchild->shape.begin(), lchild->shape.end(), greater<>() );
+    sort(rchild->shape.begin(), rchild->shape.end(), greater<>() );
     int i = 0, j = 0;
     while(i < lchild->shape.size() && j < rchild->shape.size())
     {
-      auto cur_shape = make_tuple(max(get<0>(lchild->shape[i]),get<0>(rchild->shape[j])), get<1>(lchild->shape[i])+get<1>(rchild->shape[j]), make_pair(i,j));
+      auto cur_shape = { max( lchild->shape[i][0],rchild->shape[j][0]), lchild->shape[i][1]+ rchild->shape[j][1], i, j};
       shape.emplace_back(cur_shape);
-      if(get<0>(lchild->shape[i]) > get<0>(rchild->shape[j]))
+      if( lchild->shape[i][0]  > rchild->shape[j][0])
       {
         ++i;
       }
-      else if(get<0>(lchild->shape[i]) < get<0>(rchild->shape[j]))
+      else if( lchild->shape[i][0]  < rchild->shape[j][0] )
       {
         ++j;
       }
@@ -89,3 +90,55 @@ void TreeNode::updateShape()
     }
   }
 }
+  // decltype(shape)().swap(shape);
+  // if(type == -1)
+  // {
+  //   sort(lchild->shape.begin(), lchild->shape.end(), [&](auto& a, auto& b) {return get<1>(a) > get<1>(b);});
+  //   sort(rchild->shape.begin(), rchild->shape.end(), [&](auto& a, auto& b) {return get<1>(a) > get<1>(b);});
+  //   int i = 0, j = 0;
+  //   while(i < lchild->shape.size() && j < rchild->shape.size())
+  //   {
+  //     auto cur_shape = make_tuple(get<0>(lchild->shape[i])+get<0>(rchild->shape[j]), max(get<1>(lchild->shape[i]), get<1>(rchild->shape[j])),make_pair(i,j));
+  //     shape.emplace_back(cur_shape);
+  //     if(get<1>(lchild->shape[i]) > get<1>(rchild->shape[j]))
+  //     {
+  //       ++i;
+  //     }
+  //     else if(get<1>(lchild->shape[i]) < get<1>(rchild->shape[j]))
+  //     {
+  //       ++j;
+  //     }
+  //     else
+  //     {
+  //       ++i;++j;
+  //     }
+  //   }
+  // }
+  // else
+  // {
+  //   sort(lchild->shape.begin(), lchild->shape.end(), [&](auto& a, auto& b) {return get<0>(a) > get<0>(b);});
+  //   sort(rchild->shape.begin(), rchild->shape.end(), [&](auto& a, auto& b) {return get<0>(a) > get<0>(b);});
+  //   int i = 0, j = 0;
+  //   while(i < lchild->shape.size() && j < rchild->shape.size())
+  //   {
+  //     auto cur_shape = make_tuple(max(get<0>(lchild->shape[i]),get<0>(rchild->shape[j])), get<1>(lchild->shape[i])+get<1>(rchild->shape[j]), make_pair(i,j));
+  //     shape.emplace_back(cur_shape);
+  //     if(get<0>(lchild->shape[i]) > get<0>(rchild->shape[j]))
+  //     {
+  //       ++i;
+  //     }
+  //     else if(get<0>(lchild->shape[i]) < get<0>(rchild->shape[j]))
+  //     {
+  //       ++j;
+  //     }
+  //     else
+  //     {
+  //       ++i;++j;
+  //     }
+  //   }
+  // }
+
+
+
+//1.change object(Module / SAfloorplan)'s name
+//2.change varibale name
