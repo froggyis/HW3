@@ -6,7 +6,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <vector>
-#include "../Module/module.h"
+#include "../Struct/Struct.hpp"
 using namespace std;
 
 class Parser
@@ -16,5 +16,4 @@ class Parser
     void read_net(string const &filename);
     void read_pin(string const &filename);
     
-
 };

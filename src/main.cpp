@@ -8,34 +8,14 @@
 #include <vector>
 #include <chrono>
 #include <cmath>
-#include "./Module/module.h"
-#include "./SAfloorplan/sa.h"
+#include "./Struct/Struct.hpp"
+#include "./Floorplanner/Floorplanner.hpp"
 #include "./Parser/Parser.hpp"
 #include <unistd.h>
 #include <ios>
 #include <iostream>
 #include <fstream>
 using namespace std;
-void mem_usage(double& vm_usage, double& resident_set) {
-   vm_usage = 0.0;
-   resident_set = 0.0;
-   ifstream stat_stream("/proc/self/stat",ios_base::in); //get info from proc directory
-   //create some variables to get info
-   string pid, comm, state, ppid, pgrp, session, tty_nr;
-   string tpgid, flags, minflt, cminflt, majflt, cmajflt;
-   string utime, stime, cutime, cstime, priority, nice;
-   string O, itrealvalue, starttime;
-   unsigned long vsize;
-   long rss;
-   stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
-   >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
-   >> utime >> stime >> cutime >> cstime >> priority >> nice
-   >> O >> itrealvalue >> starttime >> vsize >> rss; // don't careabout the rest
-   stat_stream.close();
-   long page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024; // for x86-64 is configuredto use 2MB pages
-   vm_usage = vsize / 1024.0;
-   resident_set = rss * page_size_kb;
-}
 
 using namespace chrono;
 using namespace std;
@@ -54,7 +34,9 @@ void WriteResult(string filename, int WL)
   output << "Blocks" << "\n";
   for(auto& hb:HBList)
   {
-    output << hb->name << " " << hb->downleft_x << " " << hb->downleft_y << " " << hb->rotated << "\n"; 
+    // output << hb->name << " " << hb->downleft_x << " " << hb->downleft_y << " " << hb->rotated << "\n"; 
+    output << hb->name << " " << hb->coor.first << " " << hb->coor.second << " " << hb->rotated << "\n"; 
+
   }
 }
 
@@ -83,7 +65,6 @@ int main(int argc, char *argv[])
   double ratio = CalDeadSpaceRatio(input);
 
 
-  // SA sa(stod(argv[5]));
   SA *sa = new SA();
   sa->region_side_len = ratio;
   int finalWL = sa->Run();
@@ -96,9 +77,6 @@ int main(int argc, char *argv[])
 	cout<< "Time measured: "<<  time.count() * 1e-9 << "seconds" <<endl;
   cout<<"========================================================"<<endl;
 
-   double vm, rss;
-   mem_usage(vm, rss);
-   cout << "Virtual Memory: " << vm << "Resident set size: " << rss << endl;
 
 
   return 0;

@@ -1,5 +1,6 @@
 #include "Parser.hpp"
 #include  <iostream>
+#include <utility> 
 using namespace std;
 extern vector<HardBlock*> HBList;
 extern unordered_map<string, HardBlock*> HBTable;
@@ -39,7 +40,9 @@ void Parser::read_hardblock(string const &filename)
             int center_x = *min_element(x, x+4) + width/2;
             int center_y = *min_element(y, y+4) + height/2;
             pin* center_pin = new pin(hb_name, center_x, center_y);
-            HardBlock *HB = new HardBlock(hb_name, width, height, center_pin, x[0], y[0]);
+            // HardBlock *HB = new HardBlock(hb_name, width, height, center_pin, x[0], y[0]);
+            HardBlock *HB = new HardBlock(hb_name, width, height, center_pin, make_pair(x[0], y[0]) );
+
             HBList.emplace_back(HB);
             HBTable[hb_name] = HB;
             PinTable[hb_name] = HB->center_pin;
@@ -81,35 +84,6 @@ void Parser::read_net(string const &filename)
     
         }
     }
-
-
-    // while(getline(in_net, tmp))
-    // {
-    //     if(tmp[3] != 'D') continue;
-    //     stringstream ss(tmp);
-    //     string temp, colon;
-    //     int degree;
-    //     while(ss >> temp >> colon >> degree)
-    //     {
-    //         net *cur_net = new net(degree);
-    //         NetList.emplace_back(cur_net);
-    //         for(int i = 0; i < degree; ++i)
-    //         {
-    //         string terminal;
-    //         fin_nets >> terminal;
-    //         if(terminal[0] == 'p')
-    //         { 
-    //             auto fixed_pin = PinTable[terminal];
-    //             NetList.back()->pins.emplace_back(fixed_pin);
-    //         }
-    //         else
-    //         {
-    //             auto hb_pin = HBTable[terminal];
-    //             NetList.back()->hardblocks.emplace_back(hb_pin);
-    //         }
-    //         }
-    //     }
-    // }
   
 }
 
