@@ -20,7 +20,6 @@ using namespace std;
 using namespace chrono;
 using namespace std;
 
-// unordered_map<string, pin*> PinTable;
 vector<HardBlock*> HBList;
 unordered_map<string, HardBlock*> HBTable;
 vector<net*> NetList;
@@ -40,9 +39,8 @@ void WriteResult(string filename, int WL)
   // }
   for(auto& hb:HBTable)
   {
-    // output << hb->name << " " << hb->downleft_x << " " << hb->downleft_y << " " << hb->rotated << "\n"; 
     output << hb.first << " " << hb.second->coor.first << " " << hb.second->coor.second << " " << hb.second->rotated << "\n"; 
-    
+
   }
 }
 
@@ -85,14 +83,13 @@ int main(int argc, char *argv[])
 
   Floorplanner *start = new Floorplanner();
   start->RegionOutline = ratio;
-  // int finalWL = start->Run();
   
   int totalWL = 0;
   vector<int> initNPE, bestNPE;
 
   auto Feasible_begin = high_resolution_clock::now();
   start->InitNPE(initNPE);
-  start->SAfloorplanning(0.1, 0., 10, false, initNPE, bestNPE, Feasible_begin);
+  start->SA(0.1, 0.9, 10, false, initNPE, bestNPE, Feasible_begin);
   auto Feasible_end = high_resolution_clock::now();
   auto Feasible_time = chrono::duration_cast<std::chrono::nanoseconds>(Feasible_end - Feasible_begin);
   cout<<"========================================================"<<endl;
@@ -107,7 +104,7 @@ int main(int argc, char *argv[])
   cout << "Find a feasible floorplan.\n" << "Total wirelength: " << totalWL << "\n";
 
   vector<int> finalNPE = bestNPE;
-  start->SAfloorplanning(0.1, 0.95, 5, true, bestNPE, finalNPE, Input_begin);//set the parameter so can debug fast, need to adjust for better solution.
+  start->SA(1, 0.9, 5, true, bestNPE, finalNPE, Input_begin);//set the parameter so can debug fast, need to adjust for better solution.
   
   
   int finalWL = 0;

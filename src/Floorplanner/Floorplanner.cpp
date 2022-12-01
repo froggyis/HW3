@@ -7,9 +7,8 @@
 #include <unordered_map>
 #include "Floorplanner.hpp"
 #include <chrono>
-
+#define Runtime 550
 using namespace std;
-#define Runtime 20
 
 extern vector<HardBlock*> HBList;
 extern unordered_map<string, HardBlock*> HBTable;
@@ -26,7 +25,6 @@ void Floorplanner::InitNPE(vector<int>& NPE)//change
   bool new_row = true;
   for(int i = 0 ; i<HBList.size(); i++)
   {
-    // cout<<"hb name : "<<hb.first<<"i: "<<i;
 
     auto HB = HBList[i];
     if(cur_width + HB->width <= RegionOutline)
@@ -165,11 +163,11 @@ vector<int> Floorplanner::Perturb(vector<int> curNPE, int M)//M3 NC
 TreeNode* Floorplanner::ConstructTree(vector<int>& NPE)//not change
 {
   int index = 0;
-  vector<TreeNode*> st;
+  vector<TreeNode*> res;
   for(auto &element:NPE)
   {
     //if this is a hardblock
-    if(element >= 0)st.emplace_back(hbNodeList[element]);
+    if(element >= 0)res.emplace_back(hbNodeList[element]);
  
     //if this is a cut node then we conduct the stockmeyer algorithm.
     else
@@ -182,13 +180,13 @@ TreeNode* Floorplanner::ConstructTree(vector<int>& NPE)//not change
       auto node = cutNodeList[index];
       index++;
       node->type = element;
-      node->rchild = st.back();st.pop_back();
-      node->lchild = st.back();st.pop_back();
-      st.emplace_back(node);
-      node->updateShape();
+      node->rchild = res.back();res.pop_back();
+      node->lchild = res.back();res.pop_back();
+      res.emplace_back(node);
+      node->stockmeyer();
     }
   }
-  return st.back(); // return back the pointer point to root
+  return res.back(); // return back the pointer point to root
 }
 
 void Floorplanner::Placement(TreeNode* node, int shapeIdx, int x, int y)//not change
@@ -209,8 +207,8 @@ void Floorplanner::Placement(TreeNode* node, int shapeIdx, int x, int y)//not ch
     node->hardblock->coor.first = x;
     node->hardblock->coor.second = y;
    
-    node->hardblock->center_pin->x_cor = x + new_width /2;
-    node->hardblock->center_pin->y_cor = y + new_height /2;
+    node->hardblock->center->x = x + new_width /2;
+    node->hardblock->center->y = y + new_height /2;
 
   }
   else
@@ -240,9 +238,7 @@ int Floorplanner::GetCost_Place(vector<int>& NPE, bool const& forWL)
   // we get the cost calculated by area and WL to imporve the quality of answer.
   for(int i = 0; i < root->shape.size(); ++i)
   {
-    // auto info = root->shape[i];
-    // int width = info[0];
-    // int height = info[1];
+  
     int width = root->shape[i][0];
     int height = root->shape[i][1];
 
@@ -274,12 +270,10 @@ int Floorplanner::GetCost_Place(vector<int>& NPE, bool const& forWL)
   return min_dif_area *10  +  totalWL;
 }
 
-void Floorplanner::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int>& initNPE, vector<int>& bestNPE,  chrono::high_resolution_clock::time_point begin)
+void Floorplanner::SA(double epsilon, double r, int k, bool forWL, vector<int>& initNPE, vector<int>& bestNPE,  chrono::high_resolution_clock::time_point begin)
 {
   auto Compute_Begin = begin;
   
-
- 
   bestNPE = initNPE;
   int MT, uphill, reject; uphill = reject = 0;
   MT = 1;
@@ -334,8 +328,10 @@ void Floorplanner::SAfloorplanning(double epsilon, double r, int k, bool forWL, 
     
       while(reject/MT <= 0.95 && T0 >= epsilon && (Compute_time.count()*1e-9 < Runtime))
       { 
+        Compute_End = chrono::high_resolution_clock::now();
+        Compute_time = chrono::duration_cast<std::chrono::nanoseconds>(Compute_End - Compute_Begin);
+
         MT = uphill = reject = 0;
-        
         while(uphill<=N && MT<=2*N)
         {
           int M = rand() % 3;
@@ -352,86 +348,21 @@ void Floorplanner::SAfloorplanning(double epsilon, double r, int k, bool forWL, 
             {
               bestNPE = curNPE;
               best_cost = cur_cost;
-              // if(best_cost == 0)
-              // { 
-              //   GetCost_Place(bestNPE, true); return; 
-              // }
+
             }
           }
           else reject ++ ;
         }
         T0 = r*T0;
       }
-
   }
+
   auto Compute_End = chrono::high_resolution_clock::now();
   auto Compute_time = chrono::duration_cast<std::chrono::nanoseconds>(Compute_End - Compute_Begin);
   cout<<"========================================================"<<endl;
 	cout<< "SA Time measured: "<<  Compute_time.count() * 1e-9 << "seconds" <<endl;
   cout<<"========================================================"<<endl;
   GetCost_Place(bestNPE, true); return; 
-  // do
-  // {
-  //   double T0 = 1000;
-  //   do
-  //   {
-  //     MT = uphill = reject = 1;
-  //     do
-  //     {
-  //       int M = 0;
-  //       if(forWL == false)  M = rand() % 3;
-  //       vector<int> tryNPE = Perturb(curNPE, M);
-  //       MT += 1;
-  //       int try_cost = GetCost_Place(tryNPE, forWL);
-  //       int delta_cost = try_cost - cur_cost;
-  //       if(delta_cost < 0 || (double)rand()/RAND_MAX < exp(-1*delta_cost/T0))
-  //       {
-  //         if(delta_cost > 0)uphill += 1;
-  //         curNPE = tryNPE;
-  //         cur_cost = try_cost; 
-  //         if(cur_cost < best_cost)
-  //         {
-  //           bestNPE = curNPE;
-  //           best_cost = cur_cost;
-  //           if(best_cost == 0)
-  //           { 
-  //             GetCost_Place(bestNPE, true); return; 
-  //           }
-  //         }
-  //       }
-  //       else
-  //       {
-  //         reject += 1;
-  //       }
-  //     }while(uphill <= N && MT <= 2*N);
-  //     T0 = r * T0;
-  //     // if(!forWL)cout<<T0<<endl;
-  //   }while(reject/MT <= 0.95 && T0 >= epsilon);
-  // }while (forWL == false);
-  // GetCost_Place(bestNPE, true); return; 
+  
 }
 
-// int Floorplanner::Run()
-// {
-//   unsigned seed = 2;
-//   srand(seed);
-
-//   int totalWL = 0;
-//   vector<int> initNPE, bestNPE;
-//   InitNPE(initNPE);
-//   SAfloorplanning(0.1, 0.9, 10, false, initNPE, bestNPE);
-
-//   for(auto& net: NetList)totalWL += net->calHPWL();
-
-//   cout << "Find a feasible floorplan.\n" << "Total wirelength: " << totalWL << "\n";
-
-//   vector<int> finalNPE = bestNPE;
-//   SAfloorplanning(10, 0.8, 5, true, bestNPE, finalNPE);//set the parameter so can debug fast, need to adjust for better solution.
-  
-  
-//   int finalWL = 0;
-//   for(auto& net: NetList)finalWL += net->calHPWL();
-//   cout << "Find a better floorplan.\n" << "Total wirelength: " << finalWL << "\n";
-
-//   return finalWL;
-// }

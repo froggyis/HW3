@@ -19,7 +19,7 @@ class Floorplanner
     TreeNode* ConstructTree(vector<int>& NPE);//NC
     void Placement(TreeNode* node, int shapeIdx, int new_x, int new_y);//NC
     int GetCost_Place(vector<int>& NPE, bool const & forWL);//WC
-    void SAfloorplanning(double epsilon, double r, int k, bool forWL, 
+    void SA(double epsilon, double r, int k, bool forWL, 
     vector<int>& curNPE, vector<int>& bestNPE,  chrono::high_resolution_clock::time_point begin);//WC
     
   

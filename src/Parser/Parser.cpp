@@ -39,13 +39,12 @@ void Parser::read_hardblock(string const &filename)
 
             int center_x = *min_element(x, x+4) + width/2;
             int center_y = *min_element(y, y+4) + height/2;
-            pin* center_pin = new pin(hb_name, center_x, center_y);
-            // HardBlock *HB = new HardBlock(hb_name, width, height, center_pin, x[0], y[0]);
-            HardBlock *HB = new HardBlock(hb_name, width, height, center_pin, make_pair(x[0], y[0]) );
+            pin* center = new pin(hb_name, center_x, center_y);
+            HardBlock *HB = new HardBlock(hb_name, width, height, center, make_pair(x[0], y[0]) );
 
             HBList.emplace_back(HB);
             HBTable[hb_name] = HB;
-            PinTable[hb_name] = HB->center_pin;
+            PinTable[hb_name] = HB->center;
         }
     }
 }

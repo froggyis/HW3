@@ -3,49 +3,31 @@
 #include <iostream>
 #include "Struct.hpp"
 
-// void HardBlock::Update(int& new_width, int& new_height, int& new_x, int& new_y)
-// {
-//   coor.first = new_x;
-//   coor.second = new_y;
-
-
-//   if(width == new_width && height == new_height)
-//   {
-//     rotated = false;
-//   }
-//   else
-//   {
-//     rotated = true;
-//   }
-//   center_pin->x_cor = new_x + new_width/2;
-//   center_pin->y_cor = new_y + new_height/2;
-// }
-
 int net::calHPWL()
 {
   int max_x, max_y, min_x, min_y;
 
-  if(pins[0]->x_cor > hardblocks[0]->center_pin->x_cor)
+  if(pins[0]->x > hardblocks[0]->center->x)
   {
-    max_x = hardblocks[0]->center_pin->x_cor;
-    min_x = pins[0]->x_cor;
+    max_x = hardblocks[0]->center->x;
+    min_x = pins[0]->x;
   }
   else 
   {
-    max_x = pins[0]->x_cor;
-    min_x = hardblocks[0]->center_pin->x_cor;
+    max_x = pins[0]->x;
+    min_x = hardblocks[0]->center->x;
   }
 
- if(pins[0]->y_cor > hardblocks[0]->center_pin->y_cor)
+ if(pins[0]->y > hardblocks[0]->center->y)
   {
-    max_y = hardblocks[0]->center_pin->y_cor;
-    min_y = pins[0]->y_cor;
+    max_y = hardblocks[0]->center->y;
+    min_y = pins[0]->y;
   }
 
   else 
   {
-    max_y = pins[0]->y_cor;
-    min_y = hardblocks[0]->center_pin->y_cor;
+    max_y = pins[0]->y;
+    min_y = hardblocks[0]->center->y;
   }
 
   min_x = INT_MAX;max_x = INT_MIN;
@@ -53,24 +35,23 @@ int net::calHPWL()
 
   for(const auto& pin: pins)
   {
-    if(pin->x_cor < min_x)  min_x = pin->x_cor;
-    if(pin->x_cor > max_x)  max_x = pin->x_cor;
-    if(pin->y_cor < min_y)  min_y = pin->y_cor;
-    if(pin->y_cor > max_y)  max_y = pin->y_cor;
+    if(pin->x < min_x)  min_x = pin->x;
+    if(pin->x > max_x)  max_x = pin->x;
+    if(pin->y < min_y)  min_y = pin->y;
+    if(pin->y > max_y)  max_y = pin->y;
   }
   for(const auto& hb: hardblocks)
   {
-    if(hb->center_pin->x_cor < min_x) min_x = hb->center_pin->x_cor;
-    if(hb->center_pin->x_cor > max_x) max_x = hb->center_pin->x_cor;
-    if(hb->center_pin->y_cor < min_y) min_y = hb->center_pin->y_cor;
-    if(hb->center_pin->y_cor > max_y) max_y = hb->center_pin->y_cor;
+    if(hb->center->x < min_x) min_x = hb->center->x;
+    if(hb->center->x > max_x) max_x = hb->center->x;
+    if(hb->center->y < min_y) min_y = hb->center->y;
+    if(hb->center->y > max_y) max_y = hb->center->y;
   }
-  // return (max_x - min_x) + (max_y - min_y);
   return (max_x + max_y) - (min_x + min_y);
   
 }
 
-void TreeNode::updateShape()
+void TreeNode::stockmeyer()
 {
   int i,j;
   shape.clear();
