@@ -359,9 +359,9 @@ void Floorplanner::SA(double epsilon, double r, int k, bool forWL, vector<int>& 
 
   auto Compute_End = chrono::high_resolution_clock::now();
   auto Compute_time = chrono::duration_cast<std::chrono::nanoseconds>(Compute_End - Compute_Begin);
-  cout<<"========================================================"<<endl;
-	cout<< "SA Time measured: "<<  Compute_time.count() * 1e-9 << "seconds" <<endl;
-  cout<<"========================================================"<<endl;
+  // cout<<"========================================================"<<endl;
+	// cout<< "SA Time measured: "<<  Compute_time.count() * 1e-9 << "seconds" <<endl;
+  // cout<<"========================================================"<<endl;
   GetCost_Place(bestNPE, true); return; 
   
 }
