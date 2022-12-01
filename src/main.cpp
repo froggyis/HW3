@@ -32,18 +32,26 @@ void WriteResult(string filename, int WL)
 
   output << "Wirelength " << WL << "\n";
   output << "Blocks" << "\n";
-  for(auto& hb:HBList)
+  // for(auto& hb:HBList)
+  // {
+  //   // output << hb->name << " " << hb->downleft_x << " " << hb->downleft_y << " " << hb->rotated << "\n"; 
+  //   output << hb->name << " " << hb->coor.first << " " << hb->coor.second << " " << hb->rotated << "\n"; 
+
+  // }
+  for(auto& hb:HBTable)
   {
     // output << hb->name << " " << hb->downleft_x << " " << hb->downleft_y << " " << hb->rotated << "\n"; 
-    output << hb->name << " " << hb->coor.first << " " << hb->coor.second << " " << hb->rotated << "\n"; 
-
+    output << hb.first << " " << hb.second->coor.first << " " << hb.second->coor.second << " " << hb.second->rotated << "\n"; 
+    
   }
 }
 
 double CalDeadSpaceRatio(double &ratio)
 {
   double area = 0;
-  for(auto hb:HBList)area += hb->height * hb->width;
+  // for(auto hb:HBList)area += hb->height * hb->width;
+  for(auto hb:HBTable)area += hb.second->height * hb.second->width;
+
   return sqrt(area*(1+ratio));
 
 }

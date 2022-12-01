@@ -14,7 +14,6 @@ extern vector<net*> NetList;
 extern vector<TreeNode*> CutNodes;
 
 
-
 void SA::InitNPE(vector<int>& NPE)//change
 {
   vector<int> tmp;
@@ -24,6 +23,8 @@ void SA::InitNPE(vector<int>& NPE)//change
   bool new_row = true;
   for(int i = 0 ; i<HBList.size(); i++)
   {
+    // cout<<"hb name : "<<hb.first<<"i: "<<i;
+
     auto HB = HBList[i];
     if(cur_width + HB->width <= RegionOutline)
     {
@@ -274,7 +275,8 @@ void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int
 {
   bestNPE = initNPE;
   int MT, uphill, reject; MT = uphill = reject = 0;
-  int N = k * HBList.size();
+  MT = 1;
+  int N = k * HBTable.size();
   vector<int> curNPE = initNPE;
   int cur_cost = GetCost(curNPE, forWL);
   int best_cost = cur_cost;
@@ -282,13 +284,13 @@ void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int
   { 
     GetCost(bestNPE, true); return; 
   }
-  do
-  {
-    double T0 = 1000;
-    do
-    {
-      MT = uphill = reject = 0;
-      do
+
+  double T0 = 1000;
+  if(forWL==false)
+    while(reject/MT <= 0.95 && T0 >= epsilon)
+    { 
+      MT = uphill = reject = 1;
+      while(uphill<=N && MT<=2*N)
       {
         int M = 0;
         if(forWL == false)  M = rand() % 3;
@@ -298,7 +300,7 @@ void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int
         int delta_cost = try_cost - cur_cost;
         if(delta_cost < 0 || (double)rand()/RAND_MAX < exp(-1*delta_cost/T0))
         {
-          if(delta_cost > 0) { uphill += 1; }
+          if(delta_cost > 0)uphill += 1;
           curNPE = tryNPE;
           cur_cost = try_cost; 
           if(cur_cost < best_cost)
@@ -311,16 +313,84 @@ void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int
             }
           }
         }
-        else
+        else reject += 1;
+      }
+      T0 = r*T0;
+    }
+
+  else
+  { 
+    while(reject/MT <= 0.95 && T0 >= epsilon)
+    { 
+      MT = uphill = reject = 1;
+      while(uphill<=N && MT<=2*N)
+      {
+        int M = 0;
+        if(forWL == false)  M = rand() % 3;
+        vector<int> tryNPE = Perturb(curNPE, M);
+        MT += 1;
+        int try_cost = GetCost(tryNPE, forWL);
+        int delta_cost = try_cost - cur_cost;
+        if(delta_cost < 0 || (double)rand()/RAND_MAX < exp(-1*delta_cost/T0))
         {
-          reject += 1;
+          if(delta_cost > 0)uphill += 1;
+          curNPE = tryNPE;
+          cur_cost = try_cost; 
+          if(cur_cost < best_cost)
+          {
+            bestNPE = curNPE;
+            best_cost = cur_cost;
+            // if(best_cost == 0)
+            // { 
+            //   GetCost(bestNPE, true); return; 
+            // }
+          }
         }
-      }while(uphill <= N && MT <= 2*N);
-      T0 = r * T0;
-      // if(!forWL)cout<<T0<<endl;
-    }while(reject/MT <= 0.95 && T0 >= epsilon);
-  }while (forWL == false);
+        else reject += 1;
+      }
+      T0 = r*T0;
+    }
+  }
   GetCost(bestNPE, true); return; 
+  // do
+  // {
+  //   double T0 = 1000;
+  //   do
+  //   {
+  //     MT = uphill = reject = 1;
+  //     do
+  //     {
+  //       int M = 0;
+  //       if(forWL == false)  M = rand() % 3;
+  //       vector<int> tryNPE = Perturb(curNPE, M);
+  //       MT += 1;
+  //       int try_cost = GetCost(tryNPE, forWL);
+  //       int delta_cost = try_cost - cur_cost;
+  //       if(delta_cost < 0 || (double)rand()/RAND_MAX < exp(-1*delta_cost/T0))
+  //       {
+  //         if(delta_cost > 0)uphill += 1;
+  //         curNPE = tryNPE;
+  //         cur_cost = try_cost; 
+  //         if(cur_cost < best_cost)
+  //         {
+  //           bestNPE = curNPE;
+  //           best_cost = cur_cost;
+  //           if(best_cost == 0)
+  //           { 
+  //             GetCost(bestNPE, true); return; 
+  //           }
+  //         }
+  //       }
+  //       else
+  //       {
+  //         reject += 1;
+  //       }
+  //     }while(uphill <= N && MT <= 2*N);
+  //     T0 = r * T0;
+  //     // if(!forWL)cout<<T0<<endl;
+  //   }while(reject/MT <= 0.95 && T0 >= epsilon);
+  // }while (forWL == false);
+  // GetCost(bestNPE, true); return; 
 }
 
 int SA::Run()
