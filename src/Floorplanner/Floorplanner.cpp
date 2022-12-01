@@ -25,7 +25,7 @@ void SA::InitNPE(vector<int>& NPE)//change
   for(int i = 0 ; i<HBList.size(); i++)
   {
     auto HB = HBList[i];
-    if(cur_width + HB->width <= region_side_len)
+    if(cur_width + HB->width <= RegionOutline)
     {
       tmp.emplace_back(i);
       if(!new_hb)
@@ -56,17 +56,14 @@ void SA::InitNPE(vector<int>& NPE)//change
 
 
 
-bool SA::isSkewed(vector<int>& curNPE, int idx)//not change
+bool SA::Skewed(vector<int>& curNPE, int idx)//C
 {
+  if(idx+2 < curNPE.size())
+    if(curNPE[idx] == curNPE[idx+2])return false;
 
-  if(idx-1 >= 0 && curNPE[idx-1] == curNPE[idx+1])
-  {
-    return false;
-  }
-  else if(idx+2 < curNPE.size() && curNPE[idx] == curNPE[idx+2])
-  {
-    return false;
-  }
+  else if(idx-1 >= 0 && curNPE[idx-1] == curNPE[idx+1])
+    if(idx-1>=0)return false;
+  
   return true;
 }
 
@@ -84,7 +81,7 @@ bool SA::Ballot(vector<int>& curNPE, int i)//changed
 
 }
 
-vector<int> SA::Perturb(vector<int> curNPE, int M)//M3 not change
+vector<int> SA::Perturb(vector<int> curNPE, int M)//M3 NC
 {
  
   vector<int>tmp;
@@ -132,14 +129,14 @@ vector<int> SA::Perturb(vector<int> curNPE, int M)//M3 not change
       {
         if(curNPE[i] >= 0 && curNPE[i+1] < 0)
         {
-          if(isSkewed(curNPE, i) && Ballot(curNPE, i))
+          if(Skewed(curNPE, i) && Ballot(curNPE, i))
           {
             SwapPos.emplace_back(i);
           }
         }
         else if(curNPE[i] < 0 && curNPE[i+1] >= 0)
         {
-          if(isSkewed(curNPE, i))
+          if(Skewed(curNPE, i))
           {
             SwapPos.emplace_back(i);
           }
@@ -163,57 +160,63 @@ vector<int> SA::Perturb(vector<int> curNPE, int M)//M3 not change
 
 TreeNode* SA::ConstructTree(vector<int>& NPE)//not change
 {
-  int cutIdx = 0;
+  int index = 0;
   vector<TreeNode*> st;
   for(auto &element:NPE)
   {
-    if(element >= 0)
-    {
-      // string hbNode_name = "sb"+ to_string(element);
-      // HardBlock* hb = HBTable[hbNode_name];
-      // TreeNode* hbNode = new TreeNode(0, hb);
-      // st.emplace_back(hbNode);
-      st.emplace_back(hbNodeList[element]);
-    }
+    //if this is a hardblock
+    if(element >= 0)st.emplace_back(hbNodeList[element]);
+ 
+    //if this is a cut node then we conduct the stockmeyer algorithm.
     else
     {
-      auto node = cutNodeList[cutIdx++];
+      //if current stack is |1|2|... then we push V into it
+      //so we first pop out 1 and 2 it will look like 12V
+      //following we conduct the algorithm to confirm which shape give us the least area
+      //after that we push the 12V into stack |12v|
+      //notice that the node 12V stands for the new abstract hardblock
+      auto node = cutNodeList[index];
+      index++;
       node->type = element;
-      node->rchild = st.back();
-      st.pop_back();
-      node->lchild = st.back();
-      st.pop_back();
+      node->rchild = st.back();st.pop_back();
+      node->lchild = st.back();st.pop_back();
       st.emplace_back(node);
       node->updateShape();
     }
   }
-  return st.back(); // root
+  return st.back(); // return back the pointer point to root
 }
 
 void SA::PlaceBlock(TreeNode* node, int shapeIdx, int x, int y)//not change
 {
-  // pair<int, int>tmp = make_pair{x, y};
   if(node->type >= 0)
   {
-    node->hardblock->Update(node->shape[shapeIdx][0], node->shape[shapeIdx][1], x, y);
+    // node->hardblock->Update(node->shape[shapeIdx][0], node->shape[shapeIdx][1], x, y);
+    // Whenever we place a new block, we need to check wether it's original placement is same as before
+    // If so, then we know this block keep it's original shape
+    // If dont, then we know this block has bennd rotated, so we maintain the coresspond information. 
+     if(node->hardblock->width == node->shape[shapeIdx][0])
+      node->hardblock->rotated=false;
+    else node->hardblock->rotated = true;
+
+    int new_width = node->shape[shapeIdx][0];
+    int new_height = node->shape[shapeIdx][1];
+
+    node->hardblock->coor.first = x;
+    node->hardblock->coor.second = y;
+   
+    node->hardblock->center_pin->x_cor = x + new_width /2;
+    node->hardblock->center_pin->y_cor = y + new_height /2;
 
   }
   else
   {
     PlaceBlock(node->lchild, node->shape[shapeIdx][2], x, y);
 
-    int displacementX = 0, displacementY = 0;
-    if(node->type == -1)
-    {
-      displacementX = node->lchild->shape[   node->shape[shapeIdx][2]    ][0];
-
-    }
-    else
-    {
-      displacementY = node->lchild->shape[   node->shape[shapeIdx][2]    ][1];
-    }
-    PlaceBlock(node->rchild, node->shape[shapeIdx][3], x+displacementX, y+displacementY);
-
+    int offset_x = 0, offset_y = 0;
+    if(node->type == -1) offset_x = node->lchild->shape[node->shape[shapeIdx][2]][0];
+    else offset_y = node->lchild->shape[   node->shape[shapeIdx][2]    ][1];
+    PlaceBlock(node->rchild, node->shape[shapeIdx][3], x+offset_x, y+offset_y);
 
   }
 }
@@ -222,47 +225,49 @@ void SA::PlaceBlock(TreeNode* node, int shapeIdx, int x, int y)//not change
 
 int SA::GetCost(vector<int>& NPE, bool const& forWL)
 {
+  int min_dif_area = INT_MAX;
+  int dif_area = 0;
+  int shape = 0;
   TreeNode* root = ConstructTree(NPE);
-  int min_out_area = INT_MAX, out_of_range_area = 0, shapeIdx = 0;
+
+  // Due to the structure we build , record.
+  // We iterate all the possible shape to look for the area which can fit in the area
+  // When the process is conduct by SA, it means whenever we got the new NPE
+  // we get the cost calculated by area and WL to imporve the quality of answer.
   for(int i = 0; i < root->shape.size(); ++i)
   {
-    auto info = root->shape[i];
-    // int cur_width = get<0>(info), cur_height = get<1>(info);
-    int cur_width = info[0];
-    int cur_height = info[1];
-    if(cur_width > region_side_len && cur_height > region_side_len)
-    {
-      out_of_range_area = cur_width * cur_height - pow(region_side_len,2);
+    // auto info = root->shape[i];
+    // int width = info[0];
+    // int height = info[1];
+    int width = root->shape[i][0];
+    int height = root->shape[i][1];
+
+  
+    if(width > RegionOutline && height > RegionOutline)
+    { 
+      dif_area = width * height - pow(RegionOutline,2);
     }
-    else if(cur_height > region_side_len)
+    else if(height > RegionOutline) dif_area = width * (height - RegionOutline);
+    else if(width > RegionOutline) dif_area= height * (width - RegionOutline);
+    else dif_area = 0;
+    
+    //We first focus on area, so we keep return the minimum area as cost
+    //It might not be a good answer but is acceptable
+    if(dif_area < min_dif_area)
     {
-      out_of_range_area = cur_width * (cur_height - region_side_len);
-    }
-    else if(cur_width > region_side_len)
-    {
-      out_of_range_area= cur_height * (cur_width - region_side_len);
-    }
-    else
-    {
-      out_of_range_area = 0;
-    }
-    // Pick 1st shape which is within the region due to time-saving.
-    // But it might not be the min-area-shape of all the qualified shape. 
-    if(out_of_range_area < min_out_area)
-    {
-      min_out_area = out_of_range_area;
-      shapeIdx = i;
+      min_dif_area = dif_area;
+      shape = i;
     }
   }
 
-  if(forWL == false)  return min_out_area * 10;
-
-  PlaceBlock(root, shapeIdx, 0, 0);
+  if(!forWL)  return min_dif_area * 10;
+  //if we find the better solution
+  //then we place the block based on the record we maintain before.
+  PlaceBlock(root, shape, 0, 0);//we set x,y to zero because we always place the block from (0,0)
   int totalWL = 0;
   for(auto& net: NetList)totalWL += net->calHPWL();
  
-
-  return min_out_area *10  +  totalWL;
+  return min_dif_area *10  +  totalWL;
 }
 
 void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int>& initNPE, vector<int>& bestNPE)
@@ -322,6 +327,7 @@ int SA::Run()
 {
   unsigned seed = 2;
   srand(seed);
+
   int totalWL = 0;
   vector<int> initNPE, bestNPE, finalNPE;
   InitNPE(initNPE);

@@ -76,8 +76,8 @@ void Parser::read_net(string const &filename)
                 }
                 else
                 { //push hardblock's center, ex: sb0 into this net
-                auto hb_pin = HBTable[pin_name_];
-                NetList.back()->hardblocks.emplace_back(hb_pin);
+                    auto hb_pin = HBTable[pin_name_];
+                    NetList.back()->hardblocks.emplace_back(hb_pin);
                 }
             
             }

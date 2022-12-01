@@ -11,7 +11,7 @@ class SA
   private:
     vector<TreeNode*> hbNodeList, cutNodeList;
     void InitNPE(vector<int>& NPE);//C
-    bool isSkewed(vector<int>& curNPE, int idx);//NC
+    bool Skewed(vector<int>& curNPE, int idx);//C
     bool Ballot(vector<int>& curNPE, int i);//C
     vector<int> Perturb(vector<int> curNPE, int M);//M3 NC
     TreeNode* ConstructTree(vector<int>& NPE);//NC
@@ -21,7 +21,7 @@ class SA
     void SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int>& curNPE, vector<int>& bestNPE);//WC
     
   public:
-    double region_side_len;
+    double RegionOutline;
     SA()
     {
       for(int i = 0; i < HBList.size(); ++i)

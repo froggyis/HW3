@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 
 
   SA *sa = new SA();
-  sa->region_side_len = ratio;
+  sa->RegionOutline = ratio;
   int finalWL = sa->Run();
  
   WriteResult(argv[4], finalWL);
