@@ -59,9 +59,12 @@ double CalDeadSpaceRatio(double &ratio)
 
 int main(int argc, char *argv[])
 {
-  auto begin = high_resolution_clock::now();
 
+  auto Input_begin = high_resolution_clock::now();
  
+  
+
+
 
   Parser *par = new Parser();
   par->read_hardblock(argv[1]);
@@ -70,19 +73,57 @@ int main(int argc, char *argv[])
 
  
   double input = stod(argv[5]);
+
+  auto Input_end = high_resolution_clock::now();
+  auto Input_time = chrono::duration_cast<std::chrono::nanoseconds>(Input_end - Input_begin);
+  cout<<"========================================================"<<endl;
+	cout<< "Input_time measured: "<<  Input_time.count() * 1e-9 << "seconds" <<endl;
+  cout<<"========================================================"<<endl;
+
   double ratio = CalDeadSpaceRatio(input);
 
 
-  SA *sa = new SA();
-  sa->RegionOutline = ratio;
-  int finalWL = sa->Run();
+  Floorplanner *start = new Floorplanner();
+  start->RegionOutline = ratio;
+  // int finalWL = start->Run();
+  
+  int totalWL = 0;
+  vector<int> initNPE, bestNPE;
+
+  auto Feasible_begin = high_resolution_clock::now();
+  start->InitNPE(initNPE);
+  start->SAfloorplanning(0.1, 0., 10, false, initNPE, bestNPE, Feasible_begin);
+  auto Feasible_end = high_resolution_clock::now();
+  auto Feasible_time = chrono::duration_cast<std::chrono::nanoseconds>(Feasible_end - Feasible_begin);
+  cout<<"========================================================"<<endl;
+	cout<< "Feasible_time measured: "<<  Feasible_time.count() * 1e-9 << "seconds" <<endl;
+  cout<<"========================================================"<<endl;
+
+
+
+
+  for(auto& net: NetList)totalWL += net->calHPWL();
+
+  cout << "Find a feasible floorplan.\n" << "Total wirelength: " << totalWL << "\n";
+
+  vector<int> finalNPE = bestNPE;
+  start->SAfloorplanning(0.1, 0.95, 5, true, bestNPE, finalNPE, Input_begin);//set the parameter so can debug fast, need to adjust for better solution.
+  
+  
+  int finalWL = 0;
+  for(auto& net: NetList)finalWL += net->calHPWL();
+  cout << "Find a better floorplan.\n" << "Total wirelength: " << finalWL << "\n";
+
+
+
+  auto Output_begin = high_resolution_clock::now();
  
   WriteResult(argv[4], finalWL);
   
-  auto end = high_resolution_clock::now();
-  auto time = chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
+  auto Output_end = high_resolution_clock::now();
+  auto Output_time = chrono::duration_cast<std::chrono::nanoseconds>(Output_end - Output_begin);
   cout<<"========================================================"<<endl;
-	cout<< "Time measured: "<<  time.count() * 1e-9 << "seconds" <<endl;
+	cout<< "Output_time measured: "<<  Output_time.count() * 1e-9 << "seconds" <<endl;
   cout<<"========================================================"<<endl;
 
 

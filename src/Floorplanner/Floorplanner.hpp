@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <chrono>
 #include "../Struct/Struct.hpp"
 using namespace std;
 
@@ -7,22 +8,23 @@ using namespace std;
 extern vector<HardBlock*> HBList;
 extern unordered_map<string, HardBlock*> HBTable;
  
-class SA
+class Floorplanner
 { 
-  private:
+  public:
     vector<TreeNode*> hbNodeList, cutNodeList;
     void InitNPE(vector<int>& NPE);//C
-    bool Skewed(vector<int>& curNPE, int idx);//C
-    bool Ballot(vector<int>& curNPE, int i);//C
-    vector<int> Perturb(vector<int> curNPE, int M);//M3 NC
+    bool Skewed(vector<int>& NPE, int idx);//C
+    bool Ballot(vector<int>& NPE, int i);//C
+    vector<int> Perturb(vector<int> NPE, int M);//M3 NC
     TreeNode* ConstructTree(vector<int>& NPE);//NC
-    void PlaceBlock(TreeNode* node, int shapeIdx, int new_x, int new_y);//NC
-    int GetCost(vector<int>& NPE, bool const & forWL);//WC
-    void SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int>& curNPE, vector<int>& bestNPE);//WC
+    void Placement(TreeNode* node, int shapeIdx, int new_x, int new_y);//NC
+    int GetCost_Place(vector<int>& NPE, bool const & forWL);//WC
+    void SAfloorplanning(double epsilon, double r, int k, bool forWL, 
+    vector<int>& curNPE, vector<int>& bestNPE,  chrono::high_resolution_clock::time_point begin);//WC
     
-  public:
+  
     double RegionOutline;
-    SA()
+    Floorplanner()
     {
       for(auto hb : HBTable)
       {
@@ -49,7 +51,7 @@ class SA
       // }
 
     };
-    int Run();
+    // int Run();
 
 };
 

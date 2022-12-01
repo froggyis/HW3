@@ -6,7 +6,10 @@
 #include <stdlib.h> 
 #include <unordered_map>
 #include "Floorplanner.hpp"
+#include <chrono>
+
 using namespace std;
+#define Runtime 20
 
 extern vector<HardBlock*> HBList;
 extern unordered_map<string, HardBlock*> HBTable;
@@ -14,7 +17,7 @@ extern vector<net*> NetList;
 extern vector<TreeNode*> CutNodes;
 
 
-void SA::InitNPE(vector<int>& NPE)//change
+void Floorplanner::InitNPE(vector<int>& NPE)//change
 {
   vector<int> tmp;
   int cur_width = 0;
@@ -57,7 +60,7 @@ void SA::InitNPE(vector<int>& NPE)//change
 
 
 
-bool SA::Skewed(vector<int>& curNPE, int idx)//C
+bool Floorplanner::Skewed(vector<int>& curNPE, int idx)//C
 {
   if(idx+2 < curNPE.size())
     if(curNPE[idx] == curNPE[idx+2])return false;
@@ -68,7 +71,7 @@ bool SA::Skewed(vector<int>& curNPE, int idx)//C
   return true;
 }
 
-bool SA::Ballot(vector<int>& curNPE, int i)//changed
+bool Floorplanner::Ballot(vector<int>& curNPE, int i)//changed
 {
   int operators = 0;
   if(curNPE[i] >= 0)
@@ -82,7 +85,7 @@ bool SA::Ballot(vector<int>& curNPE, int i)//changed
 
 }
 
-vector<int> SA::Perturb(vector<int> curNPE, int M)//M3 NC
+vector<int> Floorplanner::Perturb(vector<int> curNPE, int M)//M3 NC
 {
  
   vector<int>tmp;
@@ -159,7 +162,7 @@ vector<int> SA::Perturb(vector<int> curNPE, int M)//M3 NC
   
 }
 
-TreeNode* SA::ConstructTree(vector<int>& NPE)//not change
+TreeNode* Floorplanner::ConstructTree(vector<int>& NPE)//not change
 {
   int index = 0;
   vector<TreeNode*> st;
@@ -188,7 +191,7 @@ TreeNode* SA::ConstructTree(vector<int>& NPE)//not change
   return st.back(); // return back the pointer point to root
 }
 
-void SA::PlaceBlock(TreeNode* node, int shapeIdx, int x, int y)//not change
+void Floorplanner::Placement(TreeNode* node, int shapeIdx, int x, int y)//not change
 {
   if(node->type >= 0)
   {
@@ -212,19 +215,19 @@ void SA::PlaceBlock(TreeNode* node, int shapeIdx, int x, int y)//not change
   }
   else
   {
-    PlaceBlock(node->lchild, node->shape[shapeIdx][2], x, y);
+    Placement(node->lchild, node->shape[shapeIdx][2], x, y);
 
     int offset_x = 0, offset_y = 0;
     if(node->type == -1) offset_x = node->lchild->shape[node->shape[shapeIdx][2]][0];
     else offset_y = node->lchild->shape[   node->shape[shapeIdx][2]    ][1];
-    PlaceBlock(node->rchild, node->shape[shapeIdx][3], x+offset_x, y+offset_y);
+    Placement(node->rchild, node->shape[shapeIdx][3], x+offset_x, y+offset_y);
 
   }
 }
 
 
 
-int SA::GetCost(vector<int>& NPE, bool const& forWL)
+int Floorplanner::GetCost_Place(vector<int>& NPE, bool const& forWL)
 {
   int min_dif_area = INT_MAX;
   int dif_area = 0;
@@ -264,44 +267,49 @@ int SA::GetCost(vector<int>& NPE, bool const& forWL)
   if(!forWL)  return min_dif_area * 10;
   //if we find the better solution
   //then we place the block based on the record we maintain before.
-  PlaceBlock(root, shape, 0, 0);//we set x,y to zero because we always place the block from (0,0)
+  Placement(root, shape, 0, 0);//we set x,y to zero because we always place the block from (0,0)
   int totalWL = 0;
   for(auto& net: NetList)totalWL += net->calHPWL();
  
   return min_dif_area *10  +  totalWL;
 }
 
-void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int>& initNPE, vector<int>& bestNPE)
+void Floorplanner::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int>& initNPE, vector<int>& bestNPE,  chrono::high_resolution_clock::time_point begin)
 {
+  auto Compute_Begin = begin;
+  
+
+ 
   bestNPE = initNPE;
-  int MT, uphill, reject; MT = uphill = reject = 0;
+  int MT, uphill, reject; uphill = reject = 0;
   MT = 1;
-  int N = k * HBTable.size();
   vector<int> curNPE = initNPE;
-  int cur_cost = GetCost(curNPE, forWL);
+  vector<int> TryNPE;
+  int cur_cost = GetCost_Place(curNPE, forWL);
   int best_cost = cur_cost;
+  int N = k * HBTable.size();
+
   if(best_cost == 0)
   { 
-    GetCost(bestNPE, true); return; 
+    GetCost_Place(bestNPE, true); return; 
   }
 
   double T0 = 1000;
   if(forWL==false)
     while(reject/MT <= 0.95 && T0 >= epsilon)
     { 
-      MT = uphill = reject = 1;
+      MT = uphill = reject = 0;
       while(uphill<=N && MT<=2*N)
       {
-        int M = 0;
-        if(forWL == false)  M = rand() % 3;
-        vector<int> tryNPE = Perturb(curNPE, M);
+        int M = rand() % 3;
+        TryNPE = Perturb(curNPE, M);
         MT += 1;
-        int try_cost = GetCost(tryNPE, forWL);
+        int try_cost = GetCost_Place(TryNPE, forWL);
         int delta_cost = try_cost - cur_cost;
         if(delta_cost < 0 || (double)rand()/RAND_MAX < exp(-1*delta_cost/T0))
         {
           if(delta_cost > 0)uphill += 1;
-          curNPE = tryNPE;
+          curNPE = TryNPE;
           cur_cost = try_cost; 
           if(cur_cost < best_cost)
           {
@@ -309,49 +317,59 @@ void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int
             best_cost = cur_cost;
             if(best_cost == 0)
             { 
-              GetCost(bestNPE, true); return; 
+              GetCost_Place(bestNPE, true); 
+              return; 
             }
           }
         }
-        else reject += 1;
+        else reject ++ ;
       }
       T0 = r*T0;
     }
 
   else
   { 
-    while(reject/MT <= 0.95 && T0 >= epsilon)
-    { 
-      MT = uphill = reject = 1;
-      while(uphill<=N && MT<=2*N)
-      {
-        int M = 0;
-        if(forWL == false)  M = rand() % 3;
-        vector<int> tryNPE = Perturb(curNPE, M);
-        MT += 1;
-        int try_cost = GetCost(tryNPE, forWL);
-        int delta_cost = try_cost - cur_cost;
-        if(delta_cost < 0 || (double)rand()/RAND_MAX < exp(-1*delta_cost/T0))
+    auto Compute_End = chrono::high_resolution_clock::now();
+    auto Compute_time = chrono::duration_cast<std::chrono::nanoseconds>(Compute_End - Compute_Begin);
+    
+      while(reject/MT <= 0.95 && T0 >= epsilon && (Compute_time.count()*1e-9 < Runtime))
+      { 
+        MT = uphill = reject = 0;
+        
+        while(uphill<=N && MT<=2*N)
         {
-          if(delta_cost > 0)uphill += 1;
-          curNPE = tryNPE;
-          cur_cost = try_cost; 
-          if(cur_cost < best_cost)
+          int M = rand() % 3;
+          TryNPE = Perturb(curNPE, M);
+          MT += 1;
+          int try_cost = GetCost_Place(TryNPE, forWL);
+          int delta_cost = try_cost - cur_cost;
+          if(delta_cost < 0 || (double)rand()/RAND_MAX < exp(-1*delta_cost/T0))
           {
-            bestNPE = curNPE;
-            best_cost = cur_cost;
-            // if(best_cost == 0)
-            // { 
-            //   GetCost(bestNPE, true); return; 
-            // }
+            if(delta_cost > 0)uphill += 1;
+            curNPE = TryNPE;
+            cur_cost = try_cost; 
+            if(cur_cost < best_cost)
+            {
+              bestNPE = curNPE;
+              best_cost = cur_cost;
+              // if(best_cost == 0)
+              // { 
+              //   GetCost_Place(bestNPE, true); return; 
+              // }
+            }
           }
+          else reject ++ ;
         }
-        else reject += 1;
+        T0 = r*T0;
       }
-      T0 = r*T0;
-    }
+
   }
-  GetCost(bestNPE, true); return; 
+  auto Compute_End = chrono::high_resolution_clock::now();
+  auto Compute_time = chrono::duration_cast<std::chrono::nanoseconds>(Compute_End - Compute_Begin);
+  cout<<"========================================================"<<endl;
+	cout<< "SA Time measured: "<<  Compute_time.count() * 1e-9 << "seconds" <<endl;
+  cout<<"========================================================"<<endl;
+  GetCost_Place(bestNPE, true); return; 
   // do
   // {
   //   double T0 = 1000;
@@ -364,7 +382,7 @@ void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int
   //       if(forWL == false)  M = rand() % 3;
   //       vector<int> tryNPE = Perturb(curNPE, M);
   //       MT += 1;
-  //       int try_cost = GetCost(tryNPE, forWL);
+  //       int try_cost = GetCost_Place(tryNPE, forWL);
   //       int delta_cost = try_cost - cur_cost;
   //       if(delta_cost < 0 || (double)rand()/RAND_MAX < exp(-1*delta_cost/T0))
   //       {
@@ -377,7 +395,7 @@ void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int
   //           best_cost = cur_cost;
   //           if(best_cost == 0)
   //           { 
-  //             GetCost(bestNPE, true); return; 
+  //             GetCost_Place(bestNPE, true); return; 
   //           }
   //         }
   //       }
@@ -390,30 +408,30 @@ void SA::SAfloorplanning(double epsilon, double r, int k, bool forWL, vector<int
   //     // if(!forWL)cout<<T0<<endl;
   //   }while(reject/MT <= 0.95 && T0 >= epsilon);
   // }while (forWL == false);
-  // GetCost(bestNPE, true); return; 
+  // GetCost_Place(bestNPE, true); return; 
 }
 
-int SA::Run()
-{
-  unsigned seed = 2;
-  srand(seed);
+// int Floorplanner::Run()
+// {
+//   unsigned seed = 2;
+//   srand(seed);
 
-  int totalWL = 0;
-  vector<int> initNPE, bestNPE, finalNPE;
-  InitNPE(initNPE);
-  SAfloorplanning(0.1, 0.9, 10, false, initNPE, bestNPE);
+//   int totalWL = 0;
+//   vector<int> initNPE, bestNPE;
+//   InitNPE(initNPE);
+//   SAfloorplanning(0.1, 0.9, 10, false, initNPE, bestNPE);
 
-  for(auto& net: NetList)totalWL += net->calHPWL();
+//   for(auto& net: NetList)totalWL += net->calHPWL();
 
-  cout << "Find a feasible floorplan.\n" << "Total wirelength: " << totalWL << "\n";
+//   cout << "Find a feasible floorplan.\n" << "Total wirelength: " << totalWL << "\n";
 
-  finalNPE = bestNPE;
-  SAfloorplanning(10, 0.75, 5, true, bestNPE, finalNPE);//set the parameter so can debug fast, need to adjust for better solution.
+//   vector<int> finalNPE = bestNPE;
+//   SAfloorplanning(10, 0.8, 5, true, bestNPE, finalNPE);//set the parameter so can debug fast, need to adjust for better solution.
   
   
-  int finalWL = 0;
-  for(auto& net: NetList)finalWL += net->calHPWL();
-  cout << "Find a better floorplan.\n" << "Total wirelength: " << finalWL << "\n";
+//   int finalWL = 0;
+//   for(auto& net: NetList)finalWL += net->calHPWL();
+//   cout << "Find a better floorplan.\n" << "Total wirelength: " << finalWL << "\n";
 
-  return finalWL;
-}
+//   return finalWL;
+// }
