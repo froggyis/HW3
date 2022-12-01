@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
 
   auto Feasible_begin = high_resolution_clock::now();
   start->InitNPE(initNPE);
-  start->SA(0.1, 0.8, 10, false, initNPE, bestNPE, Feasible_begin);
+  start->SA(0.1, 0.9, 10, false, initNPE, bestNPE, Feasible_begin);
   auto Feasible_end = high_resolution_clock::now();
   auto Feasible_time = chrono::duration_cast<std::chrono::nanoseconds>(Feasible_end - Feasible_begin);
   // cout<<"========================================================"<<endl;
@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
   cout << "Find a feasible floorplan.\n" << "Total wirelength: " << totalWL << "\n";
 
   vector<int> finalNPE = bestNPE;
-  start->SA(1, 0.95, 5, true, bestNPE, finalNPE, Input_begin);//set the parameter so can debug fast, need to adjust for better solution.
+  start->SA(1, 0.75, 5, true, bestNPE, finalNPE, Input_begin);//set the parameter so can debug fast, need to adjust for better solution.
   
   
   int finalWL = 0;
